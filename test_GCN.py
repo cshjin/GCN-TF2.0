@@ -3,14 +3,10 @@ import numpy as np
 import random
 import pickle
 from models import utils, GCN
-# from nettack import nettack_single as ntk
 from sklearn.metrics import accuracy_score
 import scipy.sparse as sp
 import networkx as nx
 import matplotlib.pyplot as plt
-np_norm = lambda x: np.linalg.norm
-tf_norm = lambda x: tf.linalg.norm
-
 
 
 if __name__ == "__main__":
@@ -25,7 +21,6 @@ if __name__ == "__main__":
     flags.DEFINE_float('dropout', 0.2, 'Dropout rate (1 - keep probability).')
     flags.DEFINE_float('weight_decay', 5e-4, 'Weight for L2 loss on embedding matrix.')
     flags.DEFINE_integer('early_stopping', 2, 'Tolerance for early stopping (# of epochs).')
-    flags.DEFINE_integer('max_degree', 3, 'Maximum Chebyshev polynomial degree.')
     flags.DEFINE_float('train_share', 0.1, 'Percent of testing size.')
     flags.DEFINE_bool('output', False, 'Toggle the output.')
 
