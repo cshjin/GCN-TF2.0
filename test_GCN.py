@@ -124,6 +124,7 @@ if __name__ == "__main__":
 
     print(
         "dataset: {}".format(FLAGS.dataset),
+        "train_share: {:.1f}".format(FLAGS.train_share),
         "test_loss: {:.3f}".format(test_loss), 
         "test_acc: {:.3f}".format(test_acc)
     )
