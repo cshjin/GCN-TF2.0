@@ -74,7 +74,6 @@ def load_npz(file_name):
                 (loader['attr_data'], loader['attr_indices'], loader['attr_indptr']), 
                 shape=loader['attr_shape'])
         else:
-            print('no attr')
             # REVIEW: change to identy matrix
             attr_matrix = sp.eye(adj_matrix.shape[0], format='csr')
 

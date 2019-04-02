@@ -23,6 +23,7 @@ if __name__ == "__main__":
     flags.DEFINE_integer('early_stopping', 2, 'Tolerance for early stopping (# of epochs).')
     flags.DEFINE_float('train_share', 0.1, 'Percent of testing size.')
     flags.DEFINE_bool('output', False, 'Toggle the output.')
+    flags.DEFINE_bool('verbose', False, 'Toogle the verbose.')
 
     seed = 15
     np.random.seed(seed)
@@ -103,15 +104,16 @@ if __name__ == "__main__":
         if early_stopping == 0:
             break
 
-        print(
-            "epoch:{:03d}".format(epoch+1),
-            "train_loss:{:.3f}".format(train_loss),
-            "train_acc:{:.3f}".format(train_acc),
-            "val_loss:{:.3f}".format(val_loss),
-            "val_acc:{:.3f}".format(val_acc),
-            "test_loss:{:.3f}".format(test_loss),
-            "test_acc:{:.3f}".format(test_acc),
-            )
+        if FLAGS.verbose:
+            print(
+                "epoch:{:03d}".format(epoch+1),
+                "train_loss:{:.3f}".format(train_loss),
+                "train_acc:{:.3f}".format(train_acc),
+                "val_loss:{:.3f}".format(val_loss),
+                "val_acc:{:.3f}".format(val_acc),
+                "test_loss:{:.3f}".format(test_loss),
+                "test_acc:{:.3f}".format(test_acc),
+                )
         iters.append(epoch+1)
         train_losses.append(train_loss)
         train_accs.append(train_acc)
@@ -120,7 +122,11 @@ if __name__ == "__main__":
         test_losses.append(test_loss)
         test_accs.append(test_acc)
 
-    print("#"*79, "\nTest_loss: {:.3f}".format(test_loss), "test_acc: {:.3f}".format(test_acc))
+    print(
+        "dataset: {}".format(FLAGS.dataset),
+        "test_loss: {:.3f}".format(test_loss), 
+        "test_acc: {:.3f}".format(test_acc)
+    )
 
     ## plot the results
     # fig = plt.figure(figsize=(4, 4))
