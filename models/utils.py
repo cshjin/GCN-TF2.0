@@ -74,7 +74,7 @@ def load_npz(file_name):
                 (loader['attr_data'], loader['attr_indices'], loader['attr_indptr']), 
                 shape=loader['attr_shape'])
         else:
-            # REVIEW: change to identy matrix
+            # REVIEW: change to identity matrix
             attr_matrix = sp.eye(adj_matrix.shape[0], format='csr')
 
         labels = loader.get('labels')
