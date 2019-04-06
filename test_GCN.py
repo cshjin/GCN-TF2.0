@@ -12,10 +12,9 @@ import matplotlib.pyplot as plt
 if __name__ == "__main__":
     flags = tf.app.flags
     FLAGS = flags.FLAGS
-    flags.DEFINE_string('dataset', 'citeseer', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
+    flags.DEFINE_string('dataset', 'citeseer', 'Dataset string.')  
     flags.DEFINE_float('learning_rate', 0.01, 'Initial learning rate.')
     flags.DEFINE_integer('epochs', 200, 'Number of epochs to train.')
-    flags.DEFINE_string('model', 'gcn', 'Model string.')  # 'gcn', 'gcn_cheby', 'dense'
     flags.DEFINE_integer('hidden1', 32, 'Number of units in hidden layer 1.')
     flags.DEFINE_integer('hidden2', 16, 'Number of units in hidden layer 2.')
     flags.DEFINE_float('dropout', 0.2, 'Dropout rate (1 - keep probability).')
@@ -128,24 +127,4 @@ if __name__ == "__main__":
         "test_loss: {:.3f}".format(test_loss), 
         "test_acc: {:.3f}".format(test_acc)
     )
-
-    ## plot the results
-    # fig = plt.figure(figsize=(4, 4))
-    # plt.suptitle('{}:{:.3f}'.format(FLAGS.dataset, test_accs[-1]))
-    # ax1 = plt.subplot(2, 1, 1)
-    # ax1.plot(iters, train_losses, '--')
-    # ax1.plot(iters, val_losses, '--')
-    # ax1.plot(iters, test_losses)
-    # plt.legend(['train', 'validation', 'test'])
-    # ax1.set_ylabel('loss')
-    # # ax1.set_xlabel('epoch')
-    # ax2 = plt.subplot(2, 1, 2)
-    # ax2.plot(iters, train_accs, '--')
-    # ax2.plot(iters, val_accs, '--')
-    # ax2.plot(iters, test_accs)
-    # plt.legend(['train', 'validation', 'test'])
-    # ax2.set_ylabel('accuracy')
-    # ax2.set_xlabel('epoch')
-    # plt.show()
-
 
