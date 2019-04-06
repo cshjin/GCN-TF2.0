@@ -7,10 +7,14 @@
 import tensorflow as tf
 import numpy as np
 from models.utils import xavier_init, sp_matrix_to_sp_tensor
+from sklearn.metrics import accuracy_score
 
 spdot = tf.sparse_tensor_dense_matmul
 dot = tf.matmul
 tf.set_random_seed(15)
+
+flags = tf.app.flags
+FLAGS = flags.FLAGS
 
 class GCN():
 
@@ -23,6 +27,7 @@ class GCN():
         A: a numpy.narray represents the adjacency matrix
         X: a numpy.narray represents the feature matrix
         param: a dictionary of optinal parameters
+        with_relu: indicator of using a nonlinear activation function
 
         Notes
         -----
@@ -66,13 +71,101 @@ class GCN():
         self.session.run(self.init)
 
     def SparseConv(self, A, X, act=tf.nn.relu):
-        """ Sparse tensor convolutional layer """
+        """ Sparse tensor convolutional layer 
+        
+        Parameters
+        ----------
+        A: sparse tensor
+        X: sparse tensor
+        act: activation function
+        
+        Returns
+        -------
+        A dense tensor
+        """
         _prod = spdot(X, self.W1)
         _prod = spdot(A, _prod)
         return act(_prod)
 
     def DenseConv(self, A, X, act=lambda x: x):
-        """ Dense tensor convolutional layer """
+        """ Dense tensor convolutional layer 
+        Parameters
+        ----------
+        A: sparse tensor
+        X: dense tensor
+        act: activation function
+        
+        Returns
+        -------
+        A dense tensor
+
+        Notes
+        -----
+        The difference between the SparseConv and DenseConv is the type of X
+        """
         _prod = dot(X, self.W2)
         _prod = spdot(A, _prod)
         return act(_prod)
+
+    def train_model(self, train_idx, val_idx, labels):
+        """ Train the model with train set and validation set
+
+        Parameters
+        ----------
+        train_idx:
+        val_idx:
+        labels:
+
+        Returns
+        -------
+        None
+        """
+        feed_train = {self.node_ids: train_idx, self.node_labels: labels[train_idx]}
+        feed_val = {self.node_ids: val_idx, self.node_labels: labels[val_idx]}
+        best=0
+        threshold=3
+        early_stopping=threshold
+        for epoch in range(1000):
+            self.session.run(self.opti, feed_dict=feed_train)
+            train_loss, train_acc = self.eval_model(train_idx, labels)
+            val_loss, val_acc = self.eval_model(val_idx, labels)
+            
+            # early stopping
+            if val_acc > best:
+                best = val_acc
+                early_stopping = threshold
+            else:
+                early_stopping -= 1
+            if early_stopping == 0:
+                break
+
+            if FLAGS.verbose:
+                print(
+                "epoch:{:03d}".format(epoch+1),
+                "train_loss:{:.3f}".format(train_loss),
+                "train_acc:{:.3f}".format(train_acc),
+                "val_loss:{:.3f}".format(val_loss),
+                "val_acc:{:.3f}".format(val_acc),
+                )
+
+
+    def eval_model(self, ids, labels):
+        """ Evaluate the model by the given idx
+        
+        Parameters
+        ----------
+        idx:
+        labels:
+
+        Returns
+        -------
+        loss: 
+        accuracy_rate:
+        """
+        feed_test = {self.node_ids: ids, self.node_labels: labels[ids]}
+        preds, loss = self.session.run([self.predictions, self.loss], feed_dict=feed_test)
+        pred_labels = preds.argmax(1)
+        true_labels = labels.argmax(1)[ids]
+
+        return loss, accuracy_score(true_labels, pred_labels)
+        
