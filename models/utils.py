@@ -47,6 +47,16 @@ def sparse_dropout(x, keep_prob, noise_shape):
     return pre_out * (1./keep_prob)
 
 
+def preprocess_features(features):
+    """Row-normalize feature matrix and convert to tuple representation"""
+    rowsum = np.array(features.sum(1))
+    r_inv = np.power(rowsum.astype(float), -1).flatten()
+    r_inv[np.isinf(r_inv)] = 0.
+    r_mat_inv = sp.diags(r_inv)
+    features = r_mat_inv.dot(features)
+    return features.tocsr()
+
+
 def load_npz(file_name):
     """Load a SparseGraph from a Numpy binary file.
 
@@ -78,7 +88,7 @@ def load_npz(file_name):
             attr_matrix = sp.eye(adj_matrix.shape[0], format='csr')
 
         labels = loader.get('labels')
-
+    attr_matrix = preprocess_features(attr_matrix)
     return adj_matrix, attr_matrix, labels
 
 
@@ -166,9 +176,13 @@ def train_val_test_split_tabular(*arrays, train_size=0.5, val_size=0.3, test_siz
         result.append(X[idx_test])
     return result
 
+
 def preprocess_graph(adj):
-    """ Return the normalized laplacian matrix 
-        normalized_laplacian = D^{-1/2} (D-A)D^{-1/2}
+    """ process the graph
+        * options:
+        normalization of augmented adjacency matrix
+        formulation from convolutional filter
+        normalized graph laplacian
 
     Parameters
     ----------
@@ -179,11 +193,16 @@ def preprocess_graph(adj):
     adj_normalized: a sparse matrix represents the normalized laplacian
         matrix
     """
-    adj_ = adj + 1 * sp.eye(adj.shape[0])
-    rowsum = adj_.sum(1).A1
-    degree_mat_inv_sqrt = sp.diags(np.power(rowsum, -0.5))
-    adj_normalized = adj_.dot(degree_mat_inv_sqrt).T.dot(degree_mat_inv_sqrt).tocsr()
-    return adj_normalized
+    adj_orig = adj
+    adj = adj + 1 * sp.eye(adj.shape[0])
+    dseq = adj_orig.sum(1).A1
+    D = sp.diags(dseq)
+    D_inv_sqrt = sp.diags(np.power(dseq, -0.5))
+    # adj_normalized = D_inv_sqrt @ (D + adj) @ D_inv_sqrt
+    adj_normalized = D_inv_sqrt @ adj @ D_inv_sqrt
+    # D_inv = sp.diags(np.power(dseq, -1))
+    # adj_normalized = D_inv @ adj
+    return adj_normalized.tocsr()
 
 
 def correct_predicted(y_true, y_pred):
@@ -210,7 +229,6 @@ def correct_predicted(y_true, y_pred):
     correct_score = accuracy_score(y_true, y_pred)
 
     return correct_predicted_idx, correct_score
-
 
 
 def compute_margin_score(y_true, y_pred_prob, N=2):
@@ -342,6 +360,7 @@ def normalized_laplacian_spectrum(G):
     """
     from scipy.linalg import eigvalsh
     return eigvalsh(nx.normalized_laplacian_matrix(G).todense())
+
 
 def sp_matrix_to_sp_tensor(M):
     """ Convert a sparse matrix to a SparseTensor
