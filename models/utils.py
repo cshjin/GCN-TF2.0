@@ -177,7 +177,7 @@ def train_val_test_split_tabular(*arrays, train_size=0.5, val_size=0.3, test_siz
     return result
 
 
-def preprocess_graph(adj):
+def preprocess_graph(adj, c=1):
     """ process the graph
         * options:
         normalization of augmented adjacency matrix
@@ -194,7 +194,7 @@ def preprocess_graph(adj):
         matrix
     """
     adj_orig = adj
-    adj = adj + 1 * sp.eye(adj.shape[0])
+    adj = adj + c * sp.eye(adj.shape[0])
     dseq = adj_orig.sum(1).A1
     D = sp.diags(dseq)
     D_inv_sqrt = sp.diags(np.power(dseq, -0.5))
