@@ -63,7 +63,7 @@ def load_npz(file_name):
     """
     if not file_name.endswith('.npz'):
         file_name += '.npz'
-    with np.load(file_name) as loader:
+    with np.load(file_name, allow_pickle=True) as loader:
         loader = dict(loader)
         adj_matrix = sp.csr_matrix(
             (loader['adj_data'], loader['adj_indices'], loader['adj_indptr']), 
@@ -179,11 +179,17 @@ def preprocess_graph(adj):
     adj_normalized: a sparse matrix represents the normalized laplacian
         matrix
     """
-    adj_ = adj + 1 * sp.eye(adj.shape[0])
-    rowsum = adj_.sum(1).A1
-    degree_mat_inv_sqrt = sp.diags(np.power(rowsum, -0.5))
-    adj_normalized = adj_.dot(degree_mat_inv_sqrt).T.dot(degree_mat_inv_sqrt).tocsr()
-    return adj_normalized
+    # adj_ = adj + 1 * sp.eye(adj.shape[0])
+    # rowsum = adj_.sum(1).A1
+    # degree_mat_inv_sqrt = sp.diags(np.power(rowsum, -0.5))
+    # adj_normalized = adj_.dot(degree_mat_inv_sqrt).T.dot(degree_mat_inv_sqrt).tocsr()
+    adj = adj + 1 * sp.eye(adj.shape[0])
+    dseq = adj.sum(1).A1
+    D = sp.diags(dseq)
+    D_half = sp.diags(np.power(dseq, -0.5))
+    # adj_normalized = D_half @ (D+adj) @ D_half
+    adj_normalized = D_half @ adj @ D_half
+    return adj_normalized.tocsr()
 
 
 def correct_predicted(y_true, y_pred):
