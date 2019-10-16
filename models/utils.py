@@ -6,6 +6,7 @@ from scipy.sparse.csgraph import connected_components
 from sklearn.metrics import accuracy_score
 import networkx as nx
 
+
 def xavier_init(size):
     """ The initiation from the Xavier's paper
         ref: Understanding the difficulty of training deep feedforward neural 
@@ -28,7 +29,7 @@ def xavier_init(size):
 
 def sparse_dropout(x, keep_prob, noise_shape):
     """ Dropout for sparse tensors
-    
+
     Parameters
     ----------
     x: the tensor
@@ -76,12 +77,12 @@ def load_npz(file_name):
     with np.load(file_name, allow_pickle=True) as loader:
         loader = dict(loader)
         adj_matrix = sp.csr_matrix(
-            (loader['adj_data'], loader['adj_indices'], loader['adj_indptr']), 
+            (loader['adj_data'], loader['adj_indices'], loader['adj_indptr']),
             shape=loader['adj_shape'])
 
         if 'attr_data' in loader:
             attr_matrix = sp.csr_matrix(
-                (loader['attr_data'], loader['attr_indices'], loader['attr_indptr']), 
+                (loader['attr_data'], loader['attr_indices'], loader['attr_indptr']),
                 shape=loader['attr_shape'])
         else:
             # REVIEW: change to identity matrix
@@ -121,7 +122,6 @@ def largest_connected_components(adj, n_components=1):
 
 
 def train_val_test_split_tabular(*arrays, train_size=0.5, val_size=0.3, test_size=0.2, stratify=None, random_state=None):
-
     """
     Split the arrays or matrices into random train, validation and test subsets.
 
@@ -146,7 +146,7 @@ def train_val_test_split_tabular(*arrays, train_size=0.5, val_size=0.3, test_siz
         List containing train-validation-test split of inputs.
 
     """
-    # DEBUG: fix the error when sum(train_size + test_size) != samples 
+    # DEBUG: fix the error when sum(train_size + test_size) != samples
     if len(set(array.shape[0] for array in arrays)) != 1:
         raise ValueError("Arrays must have equal first dimension.")
     idx = np.arange(arrays[0].shape[0])
@@ -159,7 +159,7 @@ def train_val_test_split_tabular(*arrays, train_size=0.5, val_size=0.3, test_siz
         train_size=train_size + val_size,
         test_size=test_size,
         stratify=stratify)
-    
+
     if stratify is not None:
         stratify = stratify[idx_train_and_val]
         idx_train, idx_val = train_test_split(
@@ -203,6 +203,35 @@ def preprocess_graph(adj, c=1):
     # D_inv = sp.diags(np.power(dseq, -1))
     # adj_normalized = D_inv @ adj
     return adj_normalized.tocsr()
+
+
+def preprocess_graph2(adj, c=1):
+    """ process the graph
+        * options:
+        normalization of augmented adjacency matrix
+        formulation from convolutional filter
+        normalized graph laplacian
+
+    Parameters
+    ----------
+    adj: a sparse matrix represents the adjacency matrix
+
+    Returns
+    -------
+    An: a sparse matrix represents the normalized laplacian
+        matrix
+    """
+    adj_orig = adj
+    adj = adj + c * sp.eye(adj.shape[0])
+    dseq = adj_orig.sum(1).A1
+    D = sp.diags(dseq)
+    D_inv = sp.diags(np.power(dseq, -1.))
+    D_inv_sqrt = sp.diags(np.power(dseq, -0.5))
+    # adj_normalized = D_inv_sqrt @ (D + adj) @ D_inv_sqrt
+    # adj_normalized = D_inv_sqrt @ adj @ D_inv_sqrt
+    # D_inv = sp.diags(np.power(dseq, -1))
+    An = D_inv @ adj
+    return An.tocsr()
 
 
 def correct_predicted(y_true, y_pred):
@@ -262,13 +291,14 @@ def compute_margin_score(y_true, y_pred_prob, N=2):
             # _score is negative, incorrectly predicted
             _score = y_pred_prob[i][y_true[i]] - y_pred_prob[i][predict_labels[i]]
         margin_score.append(_score)
-    
+
     # pick the nodes based on the top N margin scores
     margin_score = np.array(margin_score)
     margin_score_nonneg = margin_score.copy()
-    margin_score_nonneg[margin_score_nonneg<0] = 0
+    margin_score_nonneg[margin_score_nonneg < 0] = 0
     topN = sorted(range(len(margin_score_nonneg)), key=lambda i: margin_score_nonneg[i], reverse=True)[:N]
-    lastN = sorted(range(len(margin_score_nonneg)), key=lambda i: margin_score_nonneg[i] if margin_score_nonneg[i] > 0 else 100)[:N]
+    lastN = sorted(range(len(margin_score_nonneg)),
+                   key=lambda i: margin_score_nonneg[i] if margin_score_nonneg[i] > 0 else 100)[:N]
     picked_nodes = topN + lastN
 
     return margin_score, picked_nodes
@@ -299,7 +329,7 @@ def compute_margin_score_v2(y_true, y_pred_prob, y_correct_idx, N=2):
     for i in y_correct_idx:
         _score = y_pred_prob[i][y_true[i]] - sorted(y_pred_prob[i])[-2]
         margin_score.append(_score)
-    
+
     # pick the nodes based on the top N margin scores
     margin_score = np.array(margin_score)
     topN = sorted(range(len(margin_score)), key=lambda i: margin_score[i], reverse=True)[:N]
