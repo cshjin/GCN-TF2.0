@@ -193,15 +193,16 @@ def preprocess_graph(adj, c=1):
     adj_normalized: a sparse matrix represents the normalized laplacian
         matrix
     """
-    adj_orig = adj
-    adj = adj + c * sp.eye(adj.shape[0])
-    dseq = adj_orig.sum(1).A1
+    # adj_ = adj + 1 * sp.eye(adj.shape[0])
+    # rowsum = adj_.sum(1).A1
+    # degree_mat_inv_sqrt = sp.diags(np.power(rowsum, -0.5))
+    # adj_normalized = adj_.dot(degree_mat_inv_sqrt).T.dot(degree_mat_inv_sqrt).tocsr()
+    adj = adj + 1 * sp.eye(adj.shape[0])
+    dseq = adj.sum(1).A1
     D = sp.diags(dseq)
-    D_inv_sqrt = sp.diags(np.power(dseq, -0.5))
-    # adj_normalized = D_inv_sqrt @ (D + adj) @ D_inv_sqrt
-    adj_normalized = D_inv_sqrt @ adj @ D_inv_sqrt
-    # D_inv = sp.diags(np.power(dseq, -1))
-    # adj_normalized = D_inv @ adj
+    D_half = sp.diags(np.power(dseq, -0.5))
+    # adj_normalized = D_half @ (D+adj) @ D_half
+    adj_normalized = D_half @ adj @ D_half
     return adj_normalized.tocsr()
 
 
