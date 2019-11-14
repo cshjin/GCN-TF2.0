@@ -17,7 +17,7 @@ flags = tf.app.flags
 FLAGS = flags.FLAGS
 
 
-class GCN():
+class GCN:
 
     def __init__(self, sizes, A, X, param={}, with_relu=True):
         """ Initialize the GCN from A, X and Z

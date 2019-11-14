@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 if __name__ == "__main__":
     flags = tf.app.flags
     FLAGS = flags.FLAGS
-    flags.DEFINE_string('dataset', 'citeseer', 'Dataset string.')  
+    flags.DEFINE_string('dataset', 'citeseer', 'Dataset string.')
     flags.DEFINE_float('learning_rate', 0.01, 'Initial learning rate.')
     flags.DEFINE_integer('epochs', 200, 'Number of epochs to train.')
     flags.DEFINE_integer('hidden1', 32, 'Number of units in hidden layer 1.')
@@ -55,22 +55,22 @@ if __name__ == "__main__":
     unlabeled_size = _N - train_size - val_size
 
     split_train, split_val, split_unlabeled = utils.train_val_test_split_tabular(np.arange(_N),
-                                                train_size=train_size,
-                                                val_size=val_size,
-                                                test_size=unlabeled_size,
-                                                stratify=_z_obs)
+                                                                                 train_size=train_size,
+                                                                                 val_size=val_size,
+                                                                                 test_size=unlabeled_size,
+                                                                                 stratify=_z_obs)
 
-    model = GCN.GCN(sizes, _An, _X_obs)
+    model = GCN.GCN(sizes, _A_obs, _X_obs)
 
     # build feed_dict
     def build_feed_dict(model, node_ids, labels_logits):
-        return {model.node_ids: node_ids, 
+        return {model.node_ids: node_ids,
                 model.node_labels: labels_logits[node_ids]}
 
     feed_train = build_feed_dict(model, split_train, _Z_obs)
     feed_val = build_feed_dict(model, split_val, _Z_obs)
     feed_unlabeled = build_feed_dict(model, split_unlabeled, _Z_obs)
-    
+
     iters = []
     train_losses = []
     train_accs = []
@@ -87,6 +87,6 @@ if __name__ == "__main__":
     print(
         "dataset: {}".format(FLAGS.dataset),
         "train_share: {:.1f}".format(FLAGS.train_share),
-        "test_loss: {:.3f}".format(test_loss), 
+        "test_loss: {:.3f}".format(test_loss),
         "test_acc: {:.3f}".format(test_acc)
     )

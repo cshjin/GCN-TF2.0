@@ -7,7 +7,7 @@ from sklearn.metrics import accuracy_score
 import scipy.sparse as sp
 import networkx as nx
 import matplotlib.pyplot as plt
-
+import time
 
 if __name__ == "__main__":
     flags = tf.app.flags
@@ -84,6 +84,7 @@ if __name__ == "__main__":
     early_stopping = treshold
 
     for epoch in range(1000):
+        ts = time.time()
         model.session.run(model.opti, feed_dict=feed_train)
         train_loss, train_preds = model.session.run([model.loss, model.predictions], feed_train)
         train_acc = accuracy_score(_z_obs[split_train], np.argmax(train_preds, axis=1))
@@ -102,7 +103,7 @@ if __name__ == "__main__":
             early_stopping -= 1
         if early_stopping == 0:
             break
-
+        te = time.time()
         if FLAGS.verbose:
             print(
                 "epoch:{:03d}".format(epoch+1),
@@ -112,6 +113,7 @@ if __name__ == "__main__":
                 "val_acc:{:.3f}".format(val_acc),
                 "test_loss:{:.3f}".format(test_loss),
                 "test_acc:{:.3f}".format(test_acc),
+                "time:{:.3f}".format(te-ts)
             )
         iters.append(epoch+1)
         train_losses.append(train_loss)
