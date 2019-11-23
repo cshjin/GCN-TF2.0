@@ -410,6 +410,8 @@ def sp_matrix_to_sp_tensor(M):
 
     H. J. @ 2019-02-12
     """
+    if not isinstance(M, sp.csr.csr_matrix):
+        M = M.tocsr()
     row, col = M.nonzero()
     X = tf.SparseTensor(np.mat([row, col]).T, M.data, M.shape)
     X = tf.cast(X, tf.float32)
