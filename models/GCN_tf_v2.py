@@ -1,9 +1,17 @@
+###############################################################################
+# TF 2.0 implementation of GCN.
+# This is the version without using the keras API.
+#
+# Copyright (c) 2019, H. Jin
+###############################################################################
+
 import warnings
 import os
 import numpy as np
 import scipy.sparse as sp
 from utils import sp_matrix_to_sp_tensor
 from sklearn.metrics import accuracy_score
+from time import time
 
 SEED = 15
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -26,75 +34,82 @@ np.random.seed(SEED)
 
 class GCN(object):
     def __init__(self, An, X, sizes, **kwargs):
+        """ 
+        Parameters
+        ----------
+        An : scipy.sparse matrix
+            normalized adjacency matrix
+        X : scipy.sparse matrix 
+            feature matrix
+        sizes : list
+            size in each layer
+        """
+
         self.An = sp_matrix_to_sp_tensor(An)
         self.X = sp_matrix_to_sp_tensor(X)
         self.layer_sizes = sizes
         self.shape = An.shape
 
-        self.lr = kwargs.get('lr', True)
+        self.lr = kwargs.get('lr', 1e-3)
         self.with_relu = kwargs.get('with_relu', True)
         self.with_bias = kwargs.get('with_bias', True)
         self.dropout = kwargs.get('dropout', 0.5)
-        self.verbose = kwargs.get('verbose', True)
+        self.verbose = kwargs.get('verbose', False)
 
         init_weight = tf.initializers.glorot_normal()
 
         self.W1 = tf.Variable(init_weight(shape=(self.shape[1], self.layer_sizes[0])))
+        self.W2 = tf.Variable(init_weight(shape=(self.layer_sizes)))
 
+        self.var_list = [self.W1, self.W2]
         if self.with_bias:
             self.b1 = tf.Variable(tf.zeros(self.layer_sizes[0],))
-
-        self.W2 = tf.Variable(init_weight(shape=(self.layer_sizes)))
-        if self.with_bias:
             self.b2 = tf.Variable(tf.zeros(self.layer_sizes[1],))
+            self.var_list.extend([self.b1, self.b2])
 
-        self.var_list = [self.W1, self.W2, self.b1, self.b2]
+    def train(self, idx_train, labels_train, n_iters=200):
 
-    def train(self, idx_train, labels_train, n_iters=50):
-
-        # build losses
-        # config the training: GPU or CPU
-        opt = tf.optimizers.Adam()
+        train_losses = []
+        # use adam to optimize
+        opt = tf.optimizers.Adam(learning_rate=self.lr)
         for it in range(n_iters):
-            # use adam to optimize
-            # REVIEW: compute the gradient
-            # self.labels = labels_train
-
-            # REVIEW: using GradientTape to update gradient
+            tic = time()
             with tf.GradientTape() as tape:
                 _loss = self.loss_fn(idx_train, np.eye(2)[labels_train])
             grad_list = tape.gradient(_loss, self.var_list)
             grads_and_vars = zip(grad_list, self.var_list)
             opt.apply_gradients(grads_and_vars)
 
-            # TODO: evaluate on the training
-            _loss, _acc = self.evaluate(idx_train, labels_train)
-            # evaluate on the validation
+            # evaluate on the training
+            train_loss, train_acc = self.evaluate(idx_train, labels_train)
+            # TODO: evaluate on the validation
             # self.evaluate(idx_train, labels_train)
 
             # TODO: early stopping in the training process
+            train_losses.append(train_loss)
+            toc = time()
             if self.verbose:
-                # print it, train_loss, train_acc, val_loss, val_acc, time
-                print(it, _loss, _acc)
-
-    def build(self):
-        pass
+                print("iter:{:03d}".format(it),
+                      "train_loss:{:.4f}".format(train_loss),
+                      "train_acc:{:.4f}".format(train_acc),
+                      "time:{:.4f}".format(toc - tic))
+        return train_losses
 
     def loss_fn(self, idx, labels):
+        # TODO: build the layer form keras layer api
         # first layer
-        _h1 = tf.sparse.sparse_dense_matmul(self.X, self.W1)
-        _h1 = tf.sparse.sparse_dense_matmul(self.An, _h1)
+        _h1 = spdot(self.X, self.W1)
+        _h1 = spdot(self.An, _h1)
         if self.with_bias:
             _h1 = tf.nn.bias_add(_h1, self.b1)
-        _h1 = tf.nn.relu(_h1)
-        self.h1 = tf.nn.dropout(_h1, self.dropout)
+        self.h1 = tf.nn.relu(_h1)
+        self.h1 = tf.nn.dropout(self.h1, self.dropout)
 
         # second layer
-        _h2 = tf.matmul(self.h1, self.W2)
-        _h2 = tf.sparse.sparse_dense_matmul(self.An, _h2)
+        _h2 = dot(self.h1, self.W2)
+        _h2 = spdot(self.An, _h2)
         if self.with_bias:
             _h2 = tf.nn.bias_add(_h2, self.b2)
-            # _h2 = _h2 + self.b2
         self.h2 = _h2
 
         """ calculate the loss base on idx and labels """
@@ -112,25 +127,40 @@ class GCN(object):
         return _loss, _acc
 
 
-# class GCNLayer():
-
-#     pass
-
 if __name__ == "__main__":
     import networkx as nx
 
     def _norm(A):
+        A = A + sp.eye(A.shape[0])
         deg = A.sum(1).A1
-        deg_inv = np.power(deg, -.5)
+        deg_inv = np.power(deg, -0.5)
         D_inv = sp.diags(deg_inv)
         return D_inv @ A @ D_inv
 
     G = nx.karate_club_graph()
     A = nx.adjacency_matrix(G)
+
     An = _norm(A)
     X = sp.diags(A.sum(1).A1).tocsr()
 
     y_true = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-    gcn = GCN(An, X, [16, 2])
-    gcn.train([0, 33], [0, 1])
-    print(gcn.evaluate(range(1, 33), y_true[1:33]))
+
+    with tf.device("/device:GPU:1"):
+        gcn = GCN(An, X, [16, 2], dropout=0, verbose=True)
+        gcn.train([0, 33], [0, 1])
+        test_res = gcn.evaluate(range(1, 33), y_true[1:33])
+        print("Test loss {:.4f}".format(test_res[0]),
+              "test acc {:.4f}".format(test_res[1]))
+
+    # explore the dropout in the GCN
+    # dr_losses = []
+    # test_acc = []
+    # for dr in np.arange(0, 1, 0.1):
+    #     gcn = GCN(An, X, [16, 2], dropout=0.1, verbose=True)
+    #     losses = gcn.train([0, 33], [0, 1])
+    #     print(gcn.evaluate(range(1, 33), y_true[1:33]))
+
+    #     dr_losses.append(losses)
+    #     test_acc.append(gcn.evaluate(range(1, 33), y_true[1:33]))
+    # import pickle
+    # pickle.dump([dr_losses, test_acc], open('tmp.pkl', 'wb'))
