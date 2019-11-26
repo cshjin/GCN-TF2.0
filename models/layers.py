@@ -2,7 +2,7 @@ import warnings
 import os
 import numpy as np
 import scipy.sparse as sp
-from utils import sp_matrix_to_sp_tensor
+from models.utils import sp_matrix_to_sp_tensor
 from sklearn.metrics import accuracy_score
 
 SEED = 15
@@ -55,20 +55,21 @@ class GraphConv(tf.keras.layers.Layer):
     def build(self, input_shape):
         """ GCN has two inputs : [shape(An), shape(X)]
         """
-        init_weight = tf.initializers.glorot_normal()
         fsize = input_shape[1][1]
 
-        self.weight = self.add_weight(name="weight",
-                                      shape=(fsize, self.units),
-                                      initializer=self.kernel_initializer,
-                                      constraint=self.kernel_constraint,
-                                      trainable=True)
+        if not hasattr(self, 'weight'):
+            self.weight = self.add_weight(name="weight",
+                                          shape=(fsize, self.units),
+                                          initializer=self.kernel_initializer,
+                                          constraint=self.kernel_constraint,
+                                          trainable=True)
         if self.use_bias:
-            self.bias = self.add_weight(name="bias",
-                                        shape=(self.units, ),
-                                        initializer=self.bias_initializer,
-                                        constraint=self.bias_constraint,
-                                        trainable=True)
+            if not hasattr(self, 'bias'):
+                self.bias = self.add_weight(name="bias",
+                                            shape=(self.units, ),
+                                            initializer=self.bias_initializer,
+                                            constraint=self.bias_constraint,
+                                            trainable=True)
         super(GraphConv, self).build(input_shape)
 
     def call(self, inputs):
@@ -96,10 +97,11 @@ if __name__ == "__main__":
     import networkx as nx
     G = nx.karate_club_graph()
     A = nx.adjacency_matrix(G)
-    An = sp_matrix_to_sp_tensor(A.astype('float32'))
-    X = sp_matrix_to_sp_tensor(sp.diags(A.sum(1).A1))
-    s = GraphConv(32)
-    s2 = GraphConv(units=2)
-    h1 = s([An, X])
-    h2 = s2([An, h1])
-    print(h1)
+    with tf.device("/device:GPU:0"):
+        An = sp_matrix_to_sp_tensor(A.astype('float32'))
+        X = sp_matrix_to_sp_tensor(sp.diags(A.sum(1).A1))
+        s = GraphConv(units=32)
+        s2 = GraphConv(units=2)
+        h1 = s([An, X])
+        h2 = s2([An, h1])
+        print(h1.shape, h2.shape)
