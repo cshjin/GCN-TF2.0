@@ -12,10 +12,12 @@ warnings.simplefilter(action='ignore', category=DeprecationWarning)
 
 try:
     import tensorflow.compat.v2 as tf
+    from tensorflow.keras import activations, regularizers, constraints, initializers
     tf.random.set_seed(SEED)
     spdot = tf.sparse.sparse_dense_matmul
 except ImportError:
     import tensorflow as tf
+    from tensorflow.keras import activations, regularizers, constraints, initializers
     tf.random.set_random_seed(SEED)
     spdot = tf.sparse_tensor_dense_matmul
 
@@ -23,16 +25,32 @@ dot = tf.matmul
 np.random.seed(SEED)
 
 
-class GCNLayer(tf.keras.layers.Layer):
+class GraphConv(tf.keras.layers.Layer):
 
-    def __init__(self, units=32, act=lambda x: x, **kwargs):
+    def __init__(self,
+                 units,
+                 activation=lambda x: x,
+                 use_bias=True,
+                 kernel_initializer='glorot_uniform',
+                 bias_initializer='zeros',
+                 kernel_regularizer=None,
+                 bias_regularizer=None,
+                 activity_regularizer=None,
+                 kernel_constraint=None,
+                 bias_constraint=None, **kwargs):
 
         self.units = units
-        self.activation = tf.keras.layers.Activation(act)
-        self.with_bias = kwargs.get('with_bias', True)
-        self.dropout = kwargs.get('dropout', 0.)
-        self.K = 2
-        super(GCNLayer, self).__init__()
+        self.activation = activations.get(activation)
+        self.use_bias = use_bias
+        self.kernel_initializer = initializers.get(kernel_initializer)
+        self.bias_initializer = initializers.get(bias_initializer)
+        self.kernel_regularizer = regularizers.get(kernel_regularizer)
+        self.bias_regularizer = regularizers.get(bias_regularizer)
+        self.activity_regularizer = regularizers.get(activity_regularizer)
+        self.kernel_constraint = constraints.get(kernel_constraint)
+        self.bias_constraint = constraints.get(bias_constraint)
+
+        super(GraphConv, self).__init__()
 
     def build(self, input_shape):
         """ GCN has two inputs : [shape(An), shape(X)]
@@ -42,14 +60,16 @@ class GCNLayer(tf.keras.layers.Layer):
 
         self.weight = self.add_weight(name="weight",
                                       shape=(fsize, self.units),
-                                      initializer="glorot_normal",
+                                      initializer=self.kernel_initializer,
+                                      constraint=self.kernel_constraint,
                                       trainable=True)
-        if self.with_bias:
+        if self.use_bias:
             self.bias = self.add_weight(name="bias",
                                         shape=(self.units, ),
-                                        initializer='zeros',
+                                        initializer=self.bias_initializer,
+                                        constraint=self.bias_constraint,
                                         trainable=True)
-        super(GCNLayer, self).build(input_shape)
+        super(GraphConv, self).build(input_shape)
 
     def call(self, inputs):
         """ GCN has two inputs : [An, X]
@@ -61,13 +81,15 @@ class GCNLayer(tf.keras.layers.Layer):
             h = spdot(self.X, self.weight)
         else:
             h = dot(self.X, self.weight)
-        if self.with_bias:
-            h = tf.nn.bias_add(h, self.bias)
+        output = spdot(self.An, h)
 
-        if self.dropout:
-            tf.nn.dropout(h, self.dropout)
+        if self.use_bias:
+            output = tf.nn.bias_add(output, self.bias)
 
-        return self.activation(h)
+        if self.activation:
+            output = self.activation(output)
+
+        return output
 
 
 if __name__ == "__main__":
@@ -76,8 +98,8 @@ if __name__ == "__main__":
     A = nx.adjacency_matrix(G)
     An = sp_matrix_to_sp_tensor(A.astype('float32'))
     X = sp_matrix_to_sp_tensor(sp.diags(A.sum(1).A1))
-    s = GCNLayer()
-    s2 = GCNLayer(units=2)
+    s = GraphConv(32)
+    s2 = GraphConv(units=2)
     h1 = s([An, X])
     h2 = s2([An, h1])
-    print(s2.weights)
+    print(h1)
