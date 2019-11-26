@@ -1,10 +1,12 @@
-from sklearn.model_selection import train_test_split
-import scipy.sparse as sp
-import numpy as np
-import tensorflow as tf
 from scipy.sparse.csgraph import connected_components
 from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
 import networkx as nx
+import numpy as np
+import os
+import pickle
+import scipy.sparse as sp
+import tensorflow as tf
 
 
 def xavier_init(size):
@@ -58,6 +60,61 @@ def preprocess_features(features):
     return features.tocsr()
 
 
+def load_data(dsname):
+    """ Load splitted dataset from file, otherwise, dump the splited data to file
+
+    Returns
+    -------
+    A_mat:
+    X_mat:
+    z_vec:
+    train_idx:
+    val_idx:
+    test_idx:
+    """
+    filename = 'data_split/{}.pickle'.format(dsname)
+    # if exists
+    if os.path.exists(filename):
+        print('>>> Loading data from file!!!')
+        with open(filename, 'rb') as f:
+            A_mat, X_mat, z_vec, train_idx, val_idx, test_idx = pickle.load(f)
+            return A_mat, X_mat, z_vec, train_idx, val_idx, test_idx
+
+    # if not exists
+    A_mat, X_mat, z_vec = load_npz('data/{}.npz'.format(dsname))
+    X_mat = X_mat.astype(np.float32)
+
+    # remove non-connected component
+    G = nx.from_scipy_sparse_matrix(A_mat)
+    G = max(nx.connected_component_subgraphs(G), key=len)
+    # remove selfloop edges
+    G.remove_edges_from(G.selfloop_edges())
+    A_mat = nx.adjacency_matrix(G)
+    assert A_mat.nnz == len(G.edges) * 2
+    degrees = A_mat.sum(0).A1
+    nodes = G.nodes
+    X_mat = X_mat[nodes]
+    z_vec = z_vec[nodes]
+    N = A_mat.shape[0]
+    train_size = int(0.1 * N)
+    val_size = int(0.1 * N)
+    test_size = N - train_size - val_size
+    idx = np.arange(N)
+    train_idx, test_idx = train_test_split(idx,
+                                           train_size=train_size + val_size,
+                                           test_size=test_size,
+                                           random_state=10)
+    train_idx, val_idx = train_test_split(train_idx,
+                                          train_size=train_size,
+                                          test_size=val_size,
+                                          random_state=10)
+
+    with open(filename, 'wb') as f:
+        print('>>> Dumping datasplit to file!!!')
+        pickle.dump([A_mat, X_mat, z_vec, train_idx, val_idx, test_idx], f)
+    return A_mat, X_mat, z_vec, train_idx, val_idx, test_idx
+
+
 def load_npz(file_name):
     """Load a SparseGraph from a Numpy binary file.
 
@@ -76,20 +133,28 @@ def load_npz(file_name):
         file_name += '.npz'
     with np.load(file_name, allow_pickle=True) as loader:
         loader = dict(loader)
-        adj_matrix = sp.csr_matrix(
-            (loader['adj_data'], loader['adj_indices'], loader['adj_indptr']),
-            shape=loader['adj_shape'])
+        # retrieve A
+        assert 'adj_data' in loader
+        adj_matrix = sp.csr_matrix((loader['adj_data'],
+                                    loader['adj_indices'],
+                                    loader['adj_indptr']),
+                                   shape=loader['adj_shape'])
 
+        # retrieve X
         if 'attr_data' in loader:
-            attr_matrix = sp.csr_matrix(
-                (loader['attr_data'], loader['attr_indices'], loader['attr_indptr']),
-                shape=loader['attr_shape'])
+            attr_matrix = sp.csr_matrix((loader['attr_data'],
+                                         loader['attr_indices'],
+                                         loader['attr_indptr']),
+                                        shape=loader['attr_shape'])
         else:
-            # REVIEW: change to identity matrix
-            attr_matrix = sp.eye(adj_matrix.shape[0], format='csr')
+            degrees = adj_matrix.sum(1).A1
+            attr_matrix = sp.diags(degrees)
+            attr_matrix = attr_matrix.tocsr()
 
+        # retrieve z
+        assert 'labels' in loader
         labels = loader.get('labels')
-    attr_matrix = preprocess_features(attr_matrix)
+
     return adj_matrix, attr_matrix, labels
 
 
@@ -228,9 +293,6 @@ def preprocess_graph2(adj, c=1):
     D = sp.diags(dseq)
     D_inv = sp.diags(np.power(dseq, -1.))
     D_inv_sqrt = sp.diags(np.power(dseq, -0.5))
-    # adj_normalized = D_inv_sqrt @ (D + adj) @ D_inv_sqrt
-    # adj_normalized = D_inv_sqrt @ adj @ D_inv_sqrt
-    # D_inv = sp.diags(np.power(dseq, -1))
     An = D_inv @ adj
     return An.tocsr()
 

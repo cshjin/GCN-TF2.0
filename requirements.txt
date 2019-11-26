@@ -1,6 +1,6 @@
 matplotlib
-networkx
+networkx=2.3
 numpy
 scipy
 sklearn
-tensorflow
+tensorflow=2.0
