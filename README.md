@@ -1,4 +1,4 @@
-# Vanilla GCN
+# GCN-TF2.0
 
 This is the vanilla implementation of graph convolution networks (GCN) with tensorflow 2.x.
 
