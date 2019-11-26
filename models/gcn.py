@@ -46,10 +46,10 @@ class GCN(object):
         self.layer_sizes = sizes
         self.shape = An.shape
 
-        self.lr = kwargs.get('lr', 1e-3)
         self.with_relu = kwargs.get('with_relu', True)
         self.with_bias = kwargs.get('with_bias', True)
 
+        self.lr = FLAGS.learning_rate
         self.dropout = FLAGS.dropout
         self.verbose = FLAGS.verbose
 
@@ -95,22 +95,6 @@ class GCN(object):
         return train_losses
 
     def loss_fn(self, idx, labels):
-        # TODO: build the layer form keras layer api
-
-        # # first layer
-        # _h1 = spdot(self.X, self.W1)
-        # _h1 = spdot(self.An, _h1)
-        # if self.with_bias:
-        #     _h1 = tf.nn.bias_add(_h1, self.b1)
-        # self.h1 = tf.nn.relu(_h1)
-        # self.h1 = tf.nn.dropout(self.h1, self.dropout)
-
-        # second layer
-        # _h2 = dot(self.h1, self.W2)
-        # _h2 = spdot(self.An, _h2)
-        # if self.with_bias:
-        #     _h2 = tf.nn.bias_add(_h2, self.b2)
-        # self.h2 = _h2
 
         self.h1 = self.layer1([self.An, self.X])
         self.h2 = self.layer2([self.An, self.h1])
