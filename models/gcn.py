@@ -58,18 +58,19 @@ class GCN(object):
         self.opt = tf.optimizers.Adam(learning_rate=self.lr)
 
     def train(self, idx_train, labels_train, n_iters=100):
-
-        train_losses = []
+        """ Train the model
+        idx_train : array like
+        labels_train : array like
+        """
         K = labels_train.max()+1
+        train_losses = []
 
         # use adam to optimize
         for it in range(n_iters):
-
             tic = time()
             with tf.GradientTape(persistent=True) as tape:
                 _loss = self.loss_fn(idx_train, np.eye(K)[labels_train])
 
-            """ Minimize over weights """
             # optimize over weights
             grad_list = tape.gradient(_loss, self.var_list)
             grads_and_vars = zip(grad_list, self.var_list)
@@ -80,12 +81,7 @@ class GCN(object):
 
             # evaluate on the training
             train_loss, train_acc = self.evaluate(idx_train, labels_train)
-            # TODO: evaluate on the validation
-            # self.evaluate(idx_train, labels_train)
-
-            # TODO: early stopping in the training process
             train_losses.append(train_loss)
-
             toc = time()
             if self.verbose:
                 print("iter:{:03d}".format(it),
@@ -95,20 +91,41 @@ class GCN(object):
         return train_losses
 
     def loss_fn(self, idx, labels):
+        """ Calculate the loss function 
 
+        Parameters
+        ----------
+        idx : array like
+        labels : array like
+
+        Returns
+        -------
+        _loss : scalar
+        """
         self.h1 = self.layer1([self.An, self.X])
         self.h2 = self.layer2([self.An, self.h1])
-
-        self.var_list = [self.layer1.weight, self.layer1.bias] + [self.layer2.weight, self.layer1.bias]
-
-        """ calculate the loss base on idx and labels """
+        self.var_list = self.layer1.weights + self.layer2.weights
+        # calculate the loss base on idx and labels
         _logits = tf.gather(self.h2, idx)
         _loss_per_node = tf.nn.softmax_cross_entropy_with_logits(labels=labels,
                                                                  logits=_logits)
         _loss = tf.reduce_mean(_loss_per_node)
+        _loss += FLAGS.weight_decay * sum(map(tf.nn.l2_loss, self.var_list))
         return _loss
 
     def evaluate(self, idx, true_labels):
+        """ Evaluate the model 
+
+        Parameters
+        ----------
+        idx : array like
+        true_labels : true labels
+
+        Returns
+        -------
+        _loss : scalar
+        _acc : scalar
+        """
         K = true_labels.max() + 1
         _loss = self.loss_fn(idx, np.eye(K)[true_labels]).numpy()
         _pred_logits = tf.gather(self.h2, idx)

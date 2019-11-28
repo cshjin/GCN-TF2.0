@@ -72,7 +72,7 @@ def load_data(dsname):
     val_idx:
     test_idx:
     """
-    filename = 'data_split/{}.pickle'.format(dsname)
+    filename = 'data/{}.pickle'.format(dsname)
     # if exists
     if os.path.exists(filename):
         print('>>> Loading data from file!!!')
