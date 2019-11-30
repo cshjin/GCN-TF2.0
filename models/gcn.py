@@ -68,16 +68,13 @@ class GCN(object):
         # use adam to optimize
         for it in range(n_iters):
             tic = time()
-            with tf.GradientTape(persistent=True) as tape:
+            with tf.GradientTape() as tape:
                 _loss = self.loss_fn(idx_train, np.eye(K)[labels_train])
 
             # optimize over weights
             grad_list = tape.gradient(_loss, self.var_list)
             grads_and_vars = zip(grad_list, self.var_list)
             self.opt.apply_gradients(grads_and_vars)
-
-            # release gradient tape
-            del tape
 
             # evaluate on the training
             train_loss, train_acc = self.evaluate(idx_train, labels_train)

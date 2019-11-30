@@ -4,25 +4,10 @@ import numpy as np
 import scipy.sparse as sp
 from models.utils import sp_matrix_to_sp_tensor
 from sklearn.metrics import accuracy_score
-
-SEED = 15
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-warnings.simplefilter(action='ignore', category=FutureWarning)
-warnings.simplefilter(action='ignore', category=DeprecationWarning)
-
-try:
-    import tensorflow.compat.v2 as tf
-    from tensorflow.keras import activations, regularizers, constraints, initializers
-    tf.random.set_seed(SEED)
-    spdot = tf.sparse.sparse_dense_matmul
-except ImportError:
-    import tensorflow as tf
-    from tensorflow.keras import activations, regularizers, constraints, initializers
-    tf.random.set_random_seed(SEED)
-    spdot = tf.sparse_tensor_dense_matmul
-
+import tensorflow as tf
+from tensorflow.keras import activations, regularizers, constraints, initializers
+spdot = tf.sparse.sparse_dense_matmul
 dot = tf.matmul
-np.random.seed(SEED)
 
 
 class GraphConv(tf.keras.layers.Layer):
@@ -32,12 +17,13 @@ class GraphConv(tf.keras.layers.Layer):
                  activation=lambda x: x,
                  use_bias=True,
                  kernel_initializer='glorot_uniform',
-                 bias_initializer='zeros',
                  kernel_regularizer=None,
-                 bias_regularizer=None,
-                 activity_regularizer=None,
                  kernel_constraint=None,
-                 bias_constraint=None, **kwargs):
+                 bias_initializer='zeros',
+                 bias_regularizer=None,
+                 bias_constraint=None,
+                 activity_regularizer=None,
+                 **kwargs):
 
         self.units = units
         self.activation = activations.get(activation)
@@ -55,11 +41,12 @@ class GraphConv(tf.keras.layers.Layer):
     def build(self, input_shape):
         """ GCN has two inputs : [shape(An), shape(X)]
         """
-        fsize = input_shape[1][1]
+        gsize = input_shape[0][0]  # graph size
+        fdim = input_shape[1][1]  # feature dim
 
         if not hasattr(self, 'weight'):
             self.weight = self.add_weight(name="weight",
-                                          shape=(fsize, self.units),
+                                          shape=(fdim, self.units),
                                           initializer=self.kernel_initializer,
                                           constraint=self.kernel_constraint,
                                           trainable=True)
@@ -91,17 +78,3 @@ class GraphConv(tf.keras.layers.Layer):
             output = self.activation(output)
 
         return output
-
-
-if __name__ == "__main__":
-    import networkx as nx
-    G = nx.karate_club_graph()
-    A = nx.adjacency_matrix(G)
-    with tf.device("/device:GPU:0"):
-        An = sp_matrix_to_sp_tensor(A.astype('float32'))
-        X = sp_matrix_to_sp_tensor(sp.diags(A.sum(1).A1))
-        s = GraphConv(units=32)
-        s2 = GraphConv(units=2)
-        h1 = s([An, X])
-        h2 = s2([An, h1])
-        print(h1.shape, h2.shape)
