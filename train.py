@@ -50,21 +50,23 @@ flags.DEFINE_integer('gpu_id', None, 'Specify the GPU id')
 
 
 def main(argv):
-    # config the GPU in TF
-    if FLAGS.gpu_id:
-        gpus = tf.config.experimental.list_physical_devices('GPU')
-        if gpus:
-            try:
-                tf.config.experimental.set_visible_devices(gpus[FLAGS.gpu_id], 'GPU')
-            except RuntimeError:
-                pass
+    # config the CPU/GPU in TF, assume only one GPU is use.
+    # For multi-gpu setting, please refer to
+    #   https://www.tensorflow.org/guide/gpu#using_multiple_gpus
+
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if len(gpus) == 0 or FLAGS.gpu_id == None:
+        device = "/device:CPU:0"
+    else:
+        tf.config.experimental.set_visible_devices(gpus[FLAGS.gpu_id], 'GPU')
+        device = '/device:GPU:0'
 
     A_mat, X_mat, z_vec, train_idx, val_idx, test_idx = load_data(FLAGS.dataset)
     An_mat = preprocess_graph(A_mat)
     N = A_mat.shape[0]
     K = z_vec.max() + 1
 
-    with tf.device('/device:GPU:0'):
+    with tf.device(device):
         gcn = GCN(An_mat, X_mat, [FLAGS.hidden1, K])
         gcn.train(train_idx, z_vec[train_idx])
         test_res = gcn.evaluate(test_idx, z_vec[test_idx], training=False)
