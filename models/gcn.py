@@ -48,10 +48,6 @@ class GCN(Base):
         self.layer_sizes = sizes
         self.shape = An.shape
 
-        self.lr = FLAGS.learning_rate
-        self.dropout = FLAGS.dropout
-        self.verbose = FLAGS.verbose
-
         self.layer1 = GraphConv(sizes[0], activation='relu')
         self.layer2 = GraphConv(sizes[1])
         self.opt = tf.optimizers.Adam(learning_rate=self.lr)
