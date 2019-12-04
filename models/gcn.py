@@ -7,6 +7,7 @@ from time import time
 from models.layers import GraphConv
 from models.utils import sp_matrix_to_sp_tensor
 from absl import flags
+from models.base import Base
 
 SEED = 15
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -28,7 +29,7 @@ np.random.seed(SEED)
 FLAGS = flags.FLAGS
 
 
-class GCN(object):
+class GCN(Base):
     def __init__(self, An, X, sizes, **kwargs):
         """ 
         Parameters
@@ -40,14 +41,12 @@ class GCN(object):
         sizes : list
             size in each layer
         """
+        super().__init__(**kwargs)
 
         self.An = sp_matrix_to_sp_tensor(An)
         self.X = sp_matrix_to_sp_tensor(X)
         self.layer_sizes = sizes
         self.shape = An.shape
-
-        self.with_relu = kwargs.get('with_relu', True)
-        self.with_bias = kwargs.get('with_bias', True)
 
         self.lr = FLAGS.learning_rate
         self.dropout = FLAGS.dropout
@@ -75,6 +74,8 @@ class GCN(object):
             grad_list = tape.gradient(_loss, self.var_list)
             grads_and_vars = zip(grad_list, self.var_list)
             self.opt.apply_gradients(grads_and_vars)
+            # _loss = self.loss_fn(idx_train, np.eye(K)[labels_train])
+            # self.opt.minimize(lambda:_loss, self.var_list)
 
             # evaluate on the training
             train_loss, train_acc = self.evaluate(idx_train, labels_train)
