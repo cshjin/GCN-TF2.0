@@ -29,13 +29,13 @@ def xavier_init(size):
     return tf.random_normal(shape=size, stddev=xavier_stddev)
 
 
-def sparse_dropout(x, keep_prob, noise_shape):
+def sparse_dropout(x, dropout_rate, noise_shape):
     """ Dropout for sparse tensors
 
     Parameters
     ----------
     x: the tensor
-    keep_prob: probability of dropout
+    dropout_rate: probability of dropout
     noise_shape: shape of noise
 
     Returns
@@ -43,11 +43,11 @@ def sparse_dropout(x, keep_prob, noise_shape):
     tf.tensor: A tensor after dropout
 
     """
-    random_tensor = keep_prob
+    random_tensor = 1-dropout_rate
     random_tensor += tf.random_uniform(noise_shape)
     dropout_mask = tf.cast(tf.floor(random_tensor), dtype=tf.bool)
     pre_out = tf.sparse_retain(x, dropout_mask)
-    return pre_out * (1./keep_prob)
+    return pre_out * (1./(1-dropout_rate))
 
 
 def preprocess_features(features):
