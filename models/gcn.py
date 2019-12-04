@@ -5,7 +5,7 @@ import scipy.sparse as sp
 from sklearn.metrics import accuracy_score
 from time import time
 from models.layers import GraphConv
-from models.utils import sp_matrix_to_sp_tensor
+from models.utils import sp_matrix_to_sp_tensor, sparse_dropout
 from absl import flags
 from models.base import Base
 
@@ -42,14 +42,16 @@ class GCN(Base):
             size in each layer
         """
         super().__init__(**kwargs)
-
-        self.An = sp_matrix_to_sp_tensor(An)
-        self.X = sp_matrix_to_sp_tensor(X)
+        self.An = An
+        self.X = X
         self.layer_sizes = sizes
         self.shape = An.shape
 
-        self.layer1 = GraphConv(sizes[0], activation='relu')
-        self.layer2 = GraphConv(sizes[1])
+        self.An_tf = sp_matrix_to_sp_tensor(self.An)
+        self.X_tf = sp_matrix_to_sp_tensor(self.X)
+
+        self.layer1 = GraphConv(self.layer_sizes[0], activation='relu')
+        self.layer2 = GraphConv(self.layer_sizes[1])
         self.opt = tf.optimizers.Adam(learning_rate=self.lr)
 
     def train(self, idx_train, labels_train, n_iters=100):
@@ -74,7 +76,7 @@ class GCN(Base):
             # self.opt.minimize(lambda:_loss, self.var_list)
 
             # evaluate on the training
-            train_loss, train_acc = self.evaluate(idx_train, labels_train)
+            train_loss, train_acc = self.evaluate(idx_train, labels_train, training=False)
             train_losses.append(train_loss)
             toc = time()
             if self.verbose:
@@ -84,7 +86,7 @@ class GCN(Base):
                       "time:{:.4f}".format(toc - tic))
         return train_losses
 
-    def loss_fn(self, idx, labels):
+    def loss_fn(self, idx, labels, training=True):
         """ Calculate the loss function 
 
         Parameters
@@ -96,8 +98,18 @@ class GCN(Base):
         -------
         _loss : scalar
         """
-        self.h1 = self.layer1([self.An, self.X])
-        self.h2 = self.layer2([self.An, self.h1])
+        if training:
+            _X = sparse_dropout(self.X_tf, self.dropout, [self.X.nnz])
+        else:
+            _X = self.X_tf
+
+        self.h1 = self.layer1([self.An_tf, _X])
+        if training:
+            _h1 = tf.nn.dropout(self.h1, self.dropout)
+        else:
+            _h1 = self.h1
+
+        self.h2 = self.layer2([self.An_tf, _h1])
         self.var_list = self.layer1.weights + self.layer2.weights
         # calculate the loss base on idx and labels
         _logits = tf.gather(self.h2, idx)
@@ -107,7 +119,7 @@ class GCN(Base):
         _loss += FLAGS.weight_decay * sum(map(tf.nn.l2_loss, self.var_list))
         return _loss
 
-    def evaluate(self, idx, true_labels):
+    def evaluate(self, idx, true_labels, training=False):
         """ Evaluate the model 
 
         Parameters
@@ -121,7 +133,7 @@ class GCN(Base):
         _acc : scalar
         """
         K = true_labels.max() + 1
-        _loss = self.loss_fn(idx, np.eye(K)[true_labels]).numpy()
+        _loss = self.loss_fn(idx, np.eye(K)[true_labels], training=training).numpy()
         _pred_logits = tf.gather(self.h2, idx)
         _pred_labels = tf.argmax(_pred_logits, axis=1).numpy()
         _acc = accuracy_score(_pred_labels, true_labels)

@@ -44,9 +44,9 @@ def sparse_dropout(x, dropout_rate, noise_shape):
 
     """
     random_tensor = 1-dropout_rate
-    random_tensor += tf.random_uniform(noise_shape)
+    random_tensor += tf.random.uniform(noise_shape)
     dropout_mask = tf.cast(tf.floor(random_tensor), dtype=tf.bool)
-    pre_out = tf.sparse_retain(x, dropout_mask)
+    pre_out = tf.sparse.retain(x, dropout_mask)
     return pre_out * (1./(1-dropout_rate))
 
 
