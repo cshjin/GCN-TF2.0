@@ -54,7 +54,7 @@ class GCN(Base):
         self.layer2 = GraphConv(self.layer_sizes[1])
         self.opt = tf.optimizers.Adam(learning_rate=self.lr)
 
-    def train(self, idx_train, labels_train, n_iters=100):
+    def train(self, idx_train, labels_train, idx_val, labels_val):
         """ Train the model
         idx_train : array like
         labels_train : array like
@@ -63,7 +63,7 @@ class GCN(Base):
         train_losses = []
 
         # use adam to optimize
-        for it in range(n_iters):
+        for it in range(FLAGS.epochs):
             tic = time()
             with tf.GradientTape() as tape:
                 _loss = self.loss_fn(idx_train, np.eye(K)[labels_train])
@@ -78,11 +78,15 @@ class GCN(Base):
             # evaluate on the training
             train_loss, train_acc = self.evaluate(idx_train, labels_train, training=False)
             train_losses.append(train_loss)
+            val_loss, val_acc = self.evaluate(idx_val, labels_val, training=False)
+
             toc = time()
             if self.verbose:
                 print("iter:{:03d}".format(it),
                       "train_loss:{:.4f}".format(train_loss),
                       "train_acc:{:.4f}".format(train_acc),
+                      "val_loss:{:.4f}".format(val_loss),
+                      "val_acc:{:.4f}".format(val_acc),
                       "time:{:.4f}".format(toc - tic))
         return train_losses
 
