@@ -9,7 +9,7 @@ from absl import app
 from absl import flags
 from models.layers import GraphConv
 from models.gcn import GCN
-from models.utils import sp_matrix_to_sp_tensor, preprocess_graph, load_data
+from models.utils import sp_matrix_to_sp_tensor, preprocess_graph, load_data, load_data_planetoid
 from sklearn.metrics import accuracy_score
 from time import time
 import networkx as nx
@@ -61,14 +61,14 @@ def main(argv):
         tf.config.experimental.set_visible_devices(gpus[FLAGS.gpu_id], 'GPU')
         device = '/device:GPU:0'
 
-    A_mat, X_mat, z_vec, train_idx, val_idx, test_idx = load_data(FLAGS.dataset)
+    A_mat, X_mat, z_vec, train_idx, val_idx, test_idx = load_data_planetoid(FLAGS.dataset)
     An_mat = preprocess_graph(A_mat)
     N = A_mat.shape[0]
     K = z_vec.max() + 1
 
     with tf.device(device):
         gcn = GCN(An_mat, X_mat, [FLAGS.hidden1, K])
-        gcn.train(train_idx, z_vec[train_idx])
+        gcn.train(train_idx, z_vec[train_idx], val_idx, z_vec[val_idx])
         test_res = gcn.evaluate(test_idx, z_vec[test_idx], training=False)
         print("Dataset {}".format(FLAGS.dataset),
               "Test loss {:.4f}".format(test_res[0]),

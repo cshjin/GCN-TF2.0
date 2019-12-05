@@ -7,7 +7,7 @@ import os
 import pickle
 import scipy.sparse as sp
 import tensorflow as tf
-
+from collections import defaultdict
 
 def xavier_init(size):
     """ The initiation from the Xavier's paper
@@ -112,6 +112,59 @@ def load_data(dsname):
     with open(filename, 'wb') as f:
         print('>>> Dumping datasplit to file!!!')
         pickle.dump([A_mat, X_mat, z_vec, train_idx, val_idx, test_idx], f)
+    return A_mat, X_mat, z_vec, train_idx, val_idx, test_idx
+
+
+def load_data_planetoid(dataset):
+    """ Load dataset of the splitted version from Planetoid  
+
+    Parameters
+    ----------
+    dataset: string
+        name of the dataset
+
+    Returns
+    -------
+    A_mat,
+    X_mat,
+    z_vec,
+    idx_train,
+    idx_val,
+    idx_test
+    """
+    if dataset not in ['citeseer', 'cora', 'pubmed']:
+        print("No dataset found!")
+    keys = ['x', 'y', 'tx', 'ty', 'allx', 'ally', 'graph']
+    objects = defaultdict()
+    for key in keys:
+        with open('data_split/ind.{}.{}'.format(dataset, key), 'rb') as f:
+            objects[key] = pickle.load(f, encoding='latin1')
+    test_index = [int(x) for x in open('data_split/ind.{}.test.index'.format(dataset))]
+    test_index_sort = np.sort(test_index)
+    G = nx.from_dict_of_lists(objects['graph'])
+
+    if dataset == 'citeseer':
+        # Fix citeseer dataset (there are some isolated nodes in the graph)
+        # Find isolated nodes, add them as zero-vecs into the right position
+        test_idx_range_full = range(min(test_index), max(test_index)+1)
+        tx_extended = sp.lil_matrix((len(test_idx_range_full), objects['x'].shape[1]))
+        tx_extended[test_index_sort-min(test_index_sort), :] = objects['tx']
+        objects['tx'] = tx_extended
+        ty_extended = np.zeros((len(test_idx_range_full), objects['y'].shape[1]))
+        ty_extended[test_index_sort-min(test_index_sort), :] = objects['ty']
+        objects['ty'] = ty_extended
+
+    A_mat = nx.adjacency_matrix(G)
+    X_mat = sp.vstack((objects['allx'], objects['tx'])).tolil()
+    X_mat[test_index, :] = X_mat[test_index_sort, :]
+    z_vec = np.vstack((objects['ally'], objects['ty']))
+    z_vec[test_index, :] = z_vec[test_index_sort, :]
+    z_vec = z_vec.argmax(1)
+
+    train_idx = range(len(objects['y']))
+    val_idx = range(len(objects['y']), len(objects['y'])+500)
+    test_idx = test_index_sort.tolist()
+
     return A_mat, X_mat, z_vec, train_idx, val_idx, test_idx
 
 
@@ -258,16 +311,11 @@ def preprocess_graph(adj, c=1):
     adj_normalized: a sparse matrix represents the normalized laplacian
         matrix
     """
-    # adj_ = adj + 1 * sp.eye(adj.shape[0])
-    # rowsum = adj_.sum(1).A1
-    # degree_mat_inv_sqrt = sp.diags(np.power(rowsum, -0.5))
-    # adj_normalized = adj_.dot(degree_mat_inv_sqrt).T.dot(degree_mat_inv_sqrt).tocsr()
-    adj = adj + 1 * sp.eye(adj.shape[0])
-    dseq = adj.sum(1).A1
-    D = sp.diags(dseq)
-    D_half = sp.diags(np.power(dseq, -0.5))
-    # adj_normalized = D_half @ (D+adj) @ D_half
-    adj_normalized = D_half @ adj @ D_half
+    _adj = adj + c * sp.eye(adj.shape[0])
+    _dseq = _adj.sum(1).A1
+    _D = sp.diags(_dseq)
+    _D_half = sp.diags(np.power(_dseq, -0.5))
+    adj_normalized = _D_half @ _adj @ _D_half
     return adj_normalized.tocsr()
 
 
