@@ -1,30 +1,15 @@
-import warnings
-import os
-import numpy as np
-import scipy.sparse as sp
-from sklearn.metrics import accuracy_score
-from time import time
-from models.layers import GraphConv
-from models.utils import sp_matrix_to_sp_tensor, sparse_dropout
 from absl import flags
 from models.base import Base
+from models.layers import GraphConv
+from models.utils import sp_matrix_to_sp_tensor, sparse_dropout
+from sklearn.metrics import accuracy_score
+from time import time
+import numpy as np
+import scipy.sparse as sp
+import tensorflow as tf
 
-SEED = 15
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-warnings.simplefilter(action='ignore', category=FutureWarning)
-warnings.simplefilter(action='ignore', category=DeprecationWarning)
-
-try:
-    import tensorflow.compat.v2 as tf
-    tf.random.set_seed(SEED)
-    spdot = tf.sparse.sparse_dense_matmul
-except ImportError:
-    import tensorflow as tf
-    tf.random.set_random_seed(SEED)
-    spdot = tf.sparse_tensor_dense_matmul
-
+spdot = tf.sparse.sparse_dense_matmul
 dot = tf.matmul
-np.random.seed(SEED)
 
 FLAGS = flags.FLAGS
 
@@ -61,7 +46,7 @@ class GCN(Base):
         """
         K = labels_train.max()+1
         train_losses = []
-
+        val_losses = []
         # use adam to optimize
         for it in range(FLAGS.epochs):
             tic = time()
@@ -72,14 +57,12 @@ class GCN(Base):
             grad_list = tape.gradient(_loss, self.var_list)
             grads_and_vars = zip(grad_list, self.var_list)
             self.opt.apply_gradients(grads_and_vars)
-            # _loss = self.loss_fn(idx_train, np.eye(K)[labels_train])
-            # self.opt.minimize(lambda:_loss, self.var_list)
 
             # evaluate on the training
-            train_loss, train_acc = self.evaluate(idx_train, labels_train, training=False)
+            train_loss, train_acc = self.evaluate(idx_train, labels_train, training=True)
             train_losses.append(train_loss)
             val_loss, val_acc = self.evaluate(idx_val, labels_val, training=False)
-
+            val_losses.append(val_loss)
             toc = time()
             if self.verbose:
                 print("iter:{:03d}".format(it),
@@ -120,10 +103,13 @@ class GCN(Base):
         _loss_per_node = tf.nn.softmax_cross_entropy_with_logits(labels=labels,
                                                                  logits=_logits)
         _loss = tf.reduce_mean(_loss_per_node)
-        _loss += FLAGS.weight_decay * sum(map(tf.nn.l2_loss, self.var_list))
+        # REVIEW: the weight_dacay only applys to the first layer.
+        #         Same as the original implementation of GCN.
+        # _loss += FLAGS.weight_decay * sum(map(tf.nn.l2_loss, self.var_list))
+        _loss += FLAGS.weight_decay * sum(map(tf.nn.l2_loss, self.layer1.weights))
         return _loss
 
-    def evaluate(self, idx, true_labels, training=False):
+    def evaluate(self, idx, true_labels, training):
         """ Evaluate the model 
 
         Parameters
