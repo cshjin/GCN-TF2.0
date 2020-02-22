@@ -5,23 +5,23 @@ from models.utils import sp_matrix_to_sp_tensor, sparse_dropout
 from sklearn.metrics import accuracy_score
 from time import time
 import numpy as np
-import scipy.sparse as sp
 import tensorflow as tf
 
 spdot = tf.sparse.sparse_dense_matmul
 dot = tf.matmul
 
 FLAGS = flags.FLAGS
+tf.get_logger().setLevel('ERROR')
 
 
 class GCN(Base):
     def __init__(self, An, X, sizes, **kwargs):
-        """ 
+        """
         Parameters
         ----------
         An : scipy.sparse matrix
             normalized adjacency matrix
-        X : scipy.sparse matrix 
+        X : scipy.sparse matrix
             feature matrix
         sizes : list
             size in each layer
@@ -44,7 +44,7 @@ class GCN(Base):
         idx_train : array like
         labels_train : array like
         """
-        K = labels_train.max()+1
+        K = labels_train.max() + 1
         train_losses = []
         val_losses = []
         # use adam to optimize
@@ -74,7 +74,7 @@ class GCN(Base):
         return train_losses
 
     def loss_fn(self, idx, labels, training=True):
-        """ Calculate the loss function 
+        """ Calculate the loss function
 
         Parameters
         ----------
@@ -110,7 +110,7 @@ class GCN(Base):
         return _loss
 
     def evaluate(self, idx, true_labels, training):
-        """ Evaluate the model 
+        """ Evaluate the model
 
         Parameters
         ----------

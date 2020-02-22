@@ -7,19 +7,14 @@
 
 from absl import app
 from absl import flags
-from models.layers import GraphConv
 from models.gcn import GCN
 
-from models.utils import sp_matrix_to_sp_tensor, preprocess_graph, load_data, load_data_planetoid
-from sklearn.metrics import accuracy_score
-from time import time
-import networkx as nx
+from models.utils import preprocess_graph, load_data
 import numpy as np
 import os
-import scipy.sparse as sp
 import warnings
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=DeprecationWarning)
@@ -54,7 +49,7 @@ def main(argv):
     #   https://www.tensorflow.org/guide/gpu#using_multiple_gpus
 
     gpus = tf.config.experimental.list_physical_devices('GPU')
-    if len(gpus) == 0 or FLAGS.gpu_id == None:
+    if len(gpus) == 0 or FLAGS.gpu_id is None:
         device_id = "/device:CPU:0"
     else:
         tf.config.experimental.set_visible_devices(gpus[FLAGS.gpu_id], 'GPU')
@@ -63,7 +58,7 @@ def main(argv):
     A_mat, X_mat, z_vec, train_idx, val_idx, test_idx = load_data(FLAGS.dataset)
     An_mat = preprocess_graph(A_mat)
 
-    N = A_mat.shape[0]
+    # N = A_mat.shape[0]
     K = z_vec.max() + 1
 
     with tf.device(device_id):
