@@ -1,9 +1,3 @@
-import warnings
-import os
-import numpy as np
-import scipy.sparse as sp
-from models.utils import sp_matrix_to_sp_tensor
-from sklearn.metrics import accuracy_score
 import tensorflow as tf
 from tensorflow.keras import activations, regularizers, constraints, initializers
 spdot = tf.sparse.sparse_dense_matmul
@@ -41,7 +35,7 @@ class GraphConv(tf.keras.layers.Layer):
     def build(self, input_shape):
         """ GCN has two inputs : [shape(An), shape(X)]
         """
-        gsize = input_shape[0][0]  # graph size
+        # gsize = input_shape[0][0]  # graph size
         fdim = input_shape[1][1]  # feature dim
 
         if not hasattr(self, 'weight'):

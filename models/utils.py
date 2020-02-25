@@ -9,9 +9,10 @@ import scipy.sparse as sp
 import tensorflow as tf
 from collections import defaultdict
 
+
 def xavier_init(size):
     """ The initiation from the Xavier's paper
-        ref: Understanding the difficulty of training deep feedforward neural 
+        ref: Understanding the difficulty of training deep feedforward neural
             networks, Xavier Glorot, Yoshua Bengio, AISTATS 2010.
         http://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf
 
@@ -43,11 +44,11 @@ def sparse_dropout(x, dropout_rate, noise_shape):
     tf.tensor: A tensor after dropout
 
     """
-    random_tensor = 1-dropout_rate
+    random_tensor = 1 - dropout_rate
     random_tensor += tf.random.uniform(noise_shape)
     dropout_mask = tf.cast(tf.floor(random_tensor), dtype=tf.bool)
     pre_out = tf.sparse.retain(x, dropout_mask)
-    return pre_out * (1./(1-dropout_rate))
+    return pre_out * (1. / (1 - dropout_rate))
 
 
 def preprocess_features(features):
@@ -91,7 +92,7 @@ def load_data(dsname):
     G.remove_edges_from(G.selfloop_edges())
     A_mat = nx.adjacency_matrix(G)
     assert A_mat.nnz == len(G.edges) * 2
-    degrees = A_mat.sum(0).A1
+    # degrees = A_mat.sum(0).A1
     nodes = G.nodes
     X_mat = X_mat[nodes]
     z_vec = z_vec[nodes]
@@ -116,7 +117,7 @@ def load_data(dsname):
 
 
 def load_data_planetoid(dataset):
-    """ Load dataset of the splitted version from Planetoid  
+    """ Load dataset of the splitted version from Planetoid
 
     Parameters
     ----------
@@ -146,12 +147,12 @@ def load_data_planetoid(dataset):
     if dataset == 'citeseer':
         # Fix citeseer dataset (there are some isolated nodes in the graph)
         # Find isolated nodes, add them as zero-vecs into the right position
-        test_idx_range_full = range(min(test_index), max(test_index)+1)
+        test_idx_range_full = range(min(test_index), max(test_index) + 1)
         tx_extended = sp.lil_matrix((len(test_idx_range_full), objects['x'].shape[1]))
-        tx_extended[test_index_sort-min(test_index_sort), :] = objects['tx']
+        tx_extended[test_index_sort - min(test_index_sort), :] = objects['tx']
         objects['tx'] = tx_extended
         ty_extended = np.zeros((len(test_idx_range_full), objects['y'].shape[1]))
-        ty_extended[test_index_sort-min(test_index_sort), :] = objects['ty']
+        ty_extended[test_index_sort - min(test_index_sort), :] = objects['ty']
         objects['ty'] = ty_extended
 
     A_mat = nx.adjacency_matrix(G)
@@ -162,7 +163,7 @@ def load_data_planetoid(dataset):
     z_vec = z_vec.argmax(1)
 
     train_idx = range(len(objects['y']))
-    val_idx = range(len(objects['y']), len(objects['y'])+500)
+    val_idx = range(len(objects['y']), len(objects['y']) + 500)
     test_idx = test_index_sort.tolist()
 
     return A_mat, X_mat, z_vec, train_idx, val_idx, test_idx
@@ -313,7 +314,7 @@ def preprocess_graph(adj, c=1):
     """
     _adj = adj + c * sp.eye(adj.shape[0])
     _dseq = _adj.sum(1).A1
-    _D = sp.diags(_dseq)
+    # _D = sp.diags(_dseq)
     _D_half = sp.diags(np.power(_dseq, -0.5))
     adj_normalized = _D_half @ _adj @ _D_half
     return adj_normalized.tocsr()
@@ -338,9 +339,9 @@ def preprocess_graph2(adj, c=1):
     adj_orig = adj
     adj = adj + c * sp.eye(adj.shape[0])
     dseq = adj_orig.sum(1).A1
-    D = sp.diags(dseq)
+    # D = sp.diags(dseq)
     D_inv = sp.diags(np.power(dseq, -1.))
-    D_inv_sqrt = sp.diags(np.power(dseq, -0.5))
+    # D_inv_sqrt = sp.diags(np.power(dseq, -0.5))
     An = D_inv @ adj
     return An.tocsr()
 
@@ -355,7 +356,7 @@ def correct_predicted(y_true, y_pred):
 
     Returns
     -------
-    correct_predicted_idx: a list of index of correct predicted 
+    correct_predicted_idx: a list of index of correct predicted
     correct_score: a rate of accuracy rate
 
     H. J. @ 2018-12-18
@@ -373,7 +374,7 @@ def correct_predicted(y_true, y_pred):
 
 def compute_margin_score(y_true, y_pred_prob, N=2):
     """ Implementation of the margin score
-        Def: X = Z_{v, c_{old}} - \max_{c \neq c_{old}} Z_{v, c}
+        Def: X = Z_{v, c_{old}} - max_{c \neq c_{old}} Z_{v, c}
         Pick Top N and Last N nodes as the candidate nodes
 
     Parameters
@@ -417,7 +418,7 @@ def compute_margin_score(y_true, y_pred_prob, N=2):
 
 def compute_margin_score_v2(y_true, y_pred_prob, y_correct_idx, N=2):
     """ Implementation of the margin score
-        Def: X = Z_{v, c_{old}} - \max_{c \neq c_{old}} Z_{v, c}
+        Def: X = Z_{v, c_{old}} - max_{c \neq c_{old}} Z_{v, c}
         Pick Top N and Last N nodes as the candidate nodes
 
     Parameters
@@ -433,10 +434,10 @@ def compute_margin_score_v2(y_true, y_pred_prob, y_correct_idx, N=2):
     picked_nodes: list of nodes picked from topN and lastN
         H. J. @ 2018-12-18
     """
-    size = len(y_true)
+    # size = len(y_true)
 
     margin_score = []
-    predict_labels = y_pred_prob.argmax(axis=1)
+    # predict_labels = y_pred_prob.argmax(axis=1)
     for i in y_correct_idx:
         _score = y_pred_prob[i][y_true[i]] - sorted(y_pred_prob[i])[-2]
         margin_score.append(_score)
@@ -453,7 +454,7 @@ def compute_margin_score_v2(y_true, y_pred_prob, y_correct_idx, N=2):
 
 def compute_margin_score_v3(y_true, y_pred_prob, y_correct_idx, node_correct_idx, N=2):
     """ Implementation of the margin score
-        Def: X = Z_{v, c_{old}} - \max_{c \neq c_{old}} Z_{v, c}
+        Def: X = Z_{v, c_{old}} - max_{c \neq c_{old}} Z_{v, c}
         Pick Top N and Last N nodes as the candidate nodes
 
     Parameters
@@ -472,7 +473,7 @@ def compute_margin_score_v3(y_true, y_pred_prob, y_correct_idx, node_correct_idx
     H. J. @ 2019-01-16
     """
     margin_score = {}
-    predict_labels = y_pred_prob.argmax(axis=1)
+    # predict_labels = y_pred_prob.argmax(axis=1)
     for node_idx, pred_idx in zip(node_correct_idx, y_correct_idx):
         _score = y_pred_prob[pred_idx][y_true[pred_idx]] - sorted(y_pred_prob[pred_idx])[-2]
         if _score >= 0:
@@ -512,7 +513,7 @@ def sp_matrix_to_sp_tensor(M):
 
     Returns
     -------
-    X: a tf.SparseTensor 
+    X: a tf.SparseTensor
 
     Notes
     -----
@@ -529,8 +530,8 @@ def sp_matrix_to_sp_tensor(M):
 
 
 def sparse_to_tuple(sparse_mx):
-    """ 
-    Copyright (c) Thomas Kipf 
+    """
+    Copyright (c) Thomas Kipf
     Repo: https://github.com/tkipf/gae
     """
     if not sp.isspmatrix_coo(sparse_mx):
@@ -542,8 +543,8 @@ def sparse_to_tuple(sparse_mx):
 
 
 def mask_test_edges(adj):
-    """ 
-    Copyright (c) Thomas Kipf 
+    """
+    Copyright (c) Thomas Kipf
     Repo: https://github.com/tkipf/gae
     """
     # Function to build test set with 10% positive links

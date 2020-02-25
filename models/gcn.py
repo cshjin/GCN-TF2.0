@@ -103,7 +103,7 @@ class GCN(Base):
         _loss_per_node = tf.nn.softmax_cross_entropy_with_logits(labels=labels,
                                                                  logits=_logits)
         _loss = tf.reduce_mean(_loss_per_node)
-        # REVIEW: the weight_dacay only applys to the first layer.
+        # the weight_dacay only applys to the first layer.
         #         Same as the original implementation of GCN.
         # _loss += FLAGS.weight_decay * sum(map(tf.nn.l2_loss, self.var_list))
         _loss += FLAGS.weight_decay * sum(map(tf.nn.l2_loss, self.layer1.weights))
