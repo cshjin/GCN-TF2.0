@@ -626,3 +626,55 @@ def mask_test_edges(adj):
 
     # NOTE: these edge lists only contain single direction of edge!
     return adj_train, train_edges, val_edges, val_edges_false, test_edges, test_edges_false
+
+
+def split_edge(A, val_ratio=0.05, test_ratio=0.1):
+    """ build edges for train, val, and test with positive and negative edges.
+
+    Returns
+    -------
+        A_train : sp.sparse.matrix
+        train_pos_edges : 2d array
+        train_neg_edges : 2d array
+        val_pos_edges : 2d array
+        val_neg_edges : 2d array
+        test_pos_edges : 2d array
+        test_neg_edges : 2d array
+
+    Ref: https://github.com/tkipf/gae.git
+    """
+    # from itertools import combinations
+    A = A - sp.dia_matrix((A.diagonal()[np.newaxis, :], [0]), shape=A.shape)
+    A.eliminate_zeros()
+    # Check that diag is zero:
+    assert np.diag(A.todense()).sum() == 0
+    G = nx.from_scipy_sparse_matrix(A)
+
+    pos_edges = np.array((G.edges()))
+    neg_edges = np.array(list(nx.non_edges(G)))
+
+    N_edge = pos_edges.shape[0]
+
+    edge_idx = list(range(N_edge))
+    np.random.shuffle(edge_idx)
+
+    num_test = int(np.floor(len(pos_edges) * test_ratio))
+    num_val = int(np.floor(len(pos_edges) * val_ratio))
+
+    val_edge_idx = edge_idx[:num_val]
+    test_edge_idx = edge_idx[num_val:num_val + num_test]
+    train_edge_idx = edge_idx[num_val + num_test:]
+
+    val_pos_edges = pos_edges[val_edge_idx]
+    test_pos_edges = pos_edges[test_edge_idx]
+    train_pos_edges = pos_edges[train_edge_idx]
+
+    val_neg_edges = neg_edges[val_edge_idx]
+    test_neg_edges = neg_edges[test_edge_idx]
+    train_neg_edges = neg_edges[train_edge_idx]
+
+    N_pos_edge = train_pos_edges.shape[0]
+    A_train = sp.csr_matrix((np.ones(N_pos_edge), (train_pos_edges[:, 0], train_pos_edges[:, 1])), shape=A.shape)
+    A_train = A_train + A_train.T
+
+    return A_train, train_pos_edges, train_neg_edges, val_pos_edges, val_neg_edges, test_pos_edges, test_neg_edges
