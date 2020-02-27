@@ -1,6 +1,6 @@
 from absl import flags
 from models.base import Base
-from models.layers import GraphConv
+from models.layers import GCNConv
 from models.utils import sp_matrix_to_sp_tensor, sparse_dropout
 from sklearn.metrics import accuracy_score
 from time import time
@@ -35,8 +35,8 @@ class GCN(Base):
         self.An_tf = sp_matrix_to_sp_tensor(self.An)
         self.X_tf = sp_matrix_to_sp_tensor(self.X)
 
-        self.layer1 = GraphConv(self.layer_sizes[0], activation='relu')
-        self.layer2 = GraphConv(self.layer_sizes[1])
+        self.layer1 = GCNConv(self.layer_sizes[0], activation='relu')
+        self.layer2 = GCNConv(self.layer_sizes[1])
         self.opt = tf.optimizers.Adam(learning_rate=self.lr)
 
     def train(self, idx_train, labels_train, idx_val, labels_val):

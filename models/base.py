@@ -16,3 +16,15 @@ class Base(object):
 
     def _logger(self):
         pass
+
+    def evaluate(self):
+        raise NotImplementedError
+
+    def loss_fn(self):
+        raise NotImplementedError
+
+    def save(self):
+        raise NotImplementedError
+
+    def load(self):
+        raise NotImplementedError

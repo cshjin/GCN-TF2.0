@@ -4,7 +4,7 @@ spdot = tf.sparse.sparse_dense_matmul
 dot = tf.matmul
 
 
-class GraphConv(tf.keras.layers.Layer):
+class GCNConv(tf.keras.layers.Layer):
 
     def __init__(self,
                  units,
@@ -30,7 +30,7 @@ class GraphConv(tf.keras.layers.Layer):
         self.kernel_constraint = constraints.get(kernel_constraint)
         self.bias_constraint = constraints.get(bias_constraint)
 
-        super(GraphConv, self).__init__()
+        super(GCNConv, self).__init__()
 
     def build(self, input_shape):
         """ GCN has two inputs : [shape(An), shape(X)]
@@ -51,7 +51,7 @@ class GraphConv(tf.keras.layers.Layer):
                                             initializer=self.bias_initializer,
                                             constraint=self.bias_constraint,
                                             trainable=True)
-        super(GraphConv, self).build(input_shape)
+        super(GCNConv, self).build(input_shape)
 
     def call(self, inputs):
         """ GCN has two inputs : [An, X]
