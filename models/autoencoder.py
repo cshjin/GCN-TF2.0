@@ -55,8 +55,9 @@ class GAE(Base):
             grad_and_vars = zip(grad_list, self.var_list)
             self.opt.apply_gradients(grad_and_vars)
 
-            train_roc, train_ap = self.evaluate(train_pos_edges, train_neg_edges)
-            val_roc, val_ap = self.evaluate(val_pos_edges, val_neg_edges)
+            if self.verbose:
+                train_roc, train_ap = self.evaluate(train_pos_edges, train_neg_edges)
+                val_roc, val_ap = self.evaluate(val_pos_edges, val_neg_edges)
 
             toc = time()
             if self.verbose:
@@ -161,5 +162,10 @@ class VGAE(GAE):
 
         _A = tf.constant(A.todense(), dtype=tf.float32)
         _loss = norm * tf.reduce_mean(tf.nn.weighted_cross_entropy_with_logits(_A, self.P, pos_weight))
-
+        self.kl = (0.5 / self.An.shape[0]) * \
+            tf.reduce_mean(
+                tf.reduce_sum(1 + 2 * self.z_std - tf.square(self.z_mean) - tf.square(tf.exp(self.z_std)), 1))
+        # self.kl = tf.losses.KLDivergence()
+        _loss += self.kl
+        # _loss += self.kl(self.z_std, self.z_mean)
         return _loss
