@@ -13,6 +13,11 @@ FLAGS = flags.FLAGS
 class GAE(Base):
     def __init__(self, An, X, sizes, **kwargs):
         """
+        Parameters
+        ----------
+            An : sp.csr_matrix, normalized adjacency matrix
+            X : sp.csr_matrix, feature matrix
+            sizes: list.
         """
         super(GAE, self).__init__(**kwargs)
         self.An = An
@@ -24,30 +29,34 @@ class GAE(Base):
         self.layer2 = GCNConv(self.layer_size[1])
         self.opt = tf.optimizers.Adam(learning_rate=self.lr)
 
-    def train(self, A):
-        """
-        """
-        # TODO: remove to preprocess file
-        data = split_edge(A)
-        self.A_train = data[0]
-        # self.An_tf = sp_matrix_to_sp_tensor(preprocess_graph(self.A_train))
-        train_pos_edges, train_neg_edges = data[1:3]
-        val_pos_edges, val_neg_edges = data[3:5]
-        test_pos_edges, test_neg_edges = data[5:]
+    def train(self, A_train, train_pos_edges, train_neg_edges, val_pos_edges=None, val_neg_edges=None):
+        """ Model training
 
-        pos_weight = float(A.shape[0] ** 2 - A.sum()) / A.sum()
-        norm = A.shape[0] ** 2 / float((A.shape[0] ** 2 - A.sum()) * 2)
+        Parameters
+        ----------
+            A_train : sp.csr_matrix.
+            train_pos_edges : np.array
+            train_neg_edges : np.array
+            val_pos_edges : np.array
+            val_neg_edges : np.array
+
+        Returns
+        -------
+            None
+        """
+        pos_weight = float(A_train.shape[0] ** 2 - A_train.sum()) / A_train.sum()
+        norm = A_train.shape[0] ** 2 / float((A_train.shape[0] ** 2 - A_train.sum()) * 2)
         for epoch in range(FLAGS.epochs):
             tic = time()
             with tf.GradientTape() as tape:
-                _loss = self.loss_fn(A, pos_weight=pos_weight, norm=norm)
+                _loss = self.loss_fn(A_train, pos_weight=pos_weight, norm=norm)
 
             grad_list = tape.gradient(_loss, self.var_list)
             grad_and_vars = zip(grad_list, self.var_list)
             self.opt.apply_gradients(grad_and_vars)
 
-            train_roc, train_ap = self.evaluate(train_pos_edges, train_neg_edges, A)
-            val_roc, val_ap = self.evaluate(val_pos_edges, val_neg_edges, A)
+            train_roc, train_ap = self.evaluate(train_pos_edges, train_neg_edges)
+            val_roc, val_ap = self.evaluate(val_pos_edges, val_neg_edges)
 
             toc = time()
             if self.verbose:
@@ -57,12 +66,20 @@ class GAE(Base):
                       "roc {:.4f}".format(val_roc),
                       "ap {:.4f}".format(val_ap),
                       "time:{:.4f}".format(toc - tic))
-        test_roc, test_ap = self.evaluate(test_pos_edges, test_neg_edges, A)
-        print("roc {:.4f}".format(test_roc),
-              "ap {:.4f}".format(test_ap))
 
     def loss_fn(self, A, pos_weight=1, norm=1, training=True):
-        """ 
+        """ Build the model
+
+        Parameters
+        ----------
+            A : sp.csr_matrix
+            pos_weight : scalar. Default: 1
+            norm : scalar. Default: 1
+            training : Boolean.
+
+        Returns
+        -------
+            loss : scalar
         """
         _X = sparse_dropout(self.X_tf, self.dropout, [self.X.nnz]) if training else self.X_tf
         self.h1 = self.layer1([self.An_tf, _X])
@@ -77,8 +94,19 @@ class GAE(Base):
 
         return _loss
 
-    def evaluate(self, pos_edge, neg_edge, A_orig):
-        """  """
+    def evaluate(self, pos_edge, neg_edge):
+        """ Evaluate the model performance with roc and ap scores.
+
+        Parameters
+        ----------
+            pos_edge : np.array
+            neg_edge : np.array
+
+        Returns
+        -------
+            roc_score : scalar
+            ap_score : scalar
+        """
         P = tf.matmul(self.z_mean, tf.transpose(self.z_mean))
         pred_P = tf.sigmoid(P).numpy()
         pred_pos = pred_P[pos_edge[:, 0], pos_edge[:, 1]]
@@ -92,60 +120,30 @@ class GAE(Base):
         return roc_score, ap_score
 
 
-class VGAE(Base):
+class VGAE(GAE):
     def __init__(self, An, X, sizes, **kwargs):
         """
+        Parameters
+        ----------
+            An : sp.csr_matrix, normalized adjacency matrix
+            X : sp.csr_matrix, feature matrix
+            sizes: list.
         """
-        super(VGAE, self).__init__(**kwargs)
-        self.An = An
-        self.X = X
-        self.layer_size = sizes
-        self.An_tf = sp_matrix_to_sp_tensor(self.An)
-        self.X_tf = sp_matrix_to_sp_tensor(self.X)
-        self.layer1 = GCNConv(self.layer_size[0], activation='relu')
-        self.layer2 = GCNConv(self.layer_size[1])
-        self.variational_layer = GCNConv(self.layer_size[1])
-        self.opt = tf.optimizers.Adam(learning_rate=self.lr)
-
-    def train(self, A):
-        """
-        """
-        # TODO: remove to preprocess file
-        data = split_edge(A)
-        self.A_train = data[0]
-        # self.An_tf = sp_matrix_to_sp_tensor(preprocess_graph(self.A_train))
-        train_pos_edges, train_neg_edges = data[1:3]
-        val_pos_edges, val_neg_edges = data[3:5]
-        test_pos_edges, test_neg_edges = data[5:]
-
-        pos_weight = float(A.shape[0] ** 2 - A.sum()) / A.sum()
-        norm = A.shape[0] ** 2 / float((A.shape[0] ** 2 - A.sum()) * 2)
-        for epoch in range(FLAGS.epochs):
-            tic = time()
-            with tf.GradientTape() as tape:
-                _loss = self.loss_fn(A, pos_weight=pos_weight, norm=norm)
-
-            grad_list = tape.gradient(_loss, self.var_list)
-            grad_and_vars = zip(grad_list, self.var_list)
-            self.opt.apply_gradients(grad_and_vars)
-
-            train_roc, train_ap = self.evaluate(train_pos_edges, train_neg_edges, A)
-            val_roc, val_ap = self.evaluate(val_pos_edges, val_neg_edges, A)
-
-            toc = time()
-            if self.verbose:
-                print("loss {:.4f}".format(_loss),
-                      "roc {:.4f}".format(train_roc),
-                      "ap {:.4f}".format(train_ap),
-                      "roc {:.4f}".format(val_roc),
-                      "ap {:.4f}".format(val_ap),
-                      "time:{:.4f}".format(toc - tic))
-        test_roc, test_ap = self.evaluate(test_pos_edges, test_neg_edges, A)
-        print("roc {:.4f}".format(test_roc),
-              "ap {:.4f}".format(test_ap))
+        super(VGAE, self).__init__(An, X, sizes, **kwargs)
 
     def loss_fn(self, A, pos_weight=1, norm=1, training=True):
-        """ 
+        """ Build the model
+
+        Parameters
+        ----------
+            A : sp.csr_matrix
+            pos_weight : scalar. Default: 1
+            norm : scalar. Default: 1
+            training : Boolean.
+
+        Returns
+        -------
+            loss : scalar
         """
         _X = sparse_dropout(self.X_tf, self.dropout, [self.X.nnz]) if training else self.X_tf
         self.h1 = self.layer1([self.An_tf, _X])
@@ -165,17 +163,3 @@ class VGAE(Base):
         _loss = norm * tf.reduce_mean(tf.nn.weighted_cross_entropy_with_logits(_A, self.P, pos_weight))
 
         return _loss
-
-    def evaluate(self, pos_edge, neg_edge, A_orig):
-        """  """
-        P = tf.matmul(self.z_mean, tf.transpose(self.z_mean))
-        pred_P = tf.sigmoid(P).numpy()
-        pred_pos = pred_P[pos_edge[:, 0], pos_edge[:, 1]]
-        pred_neg = pred_P[neg_edge[:, 0], neg_edge[:, 1]]
-
-        preds_all = np.hstack([pred_pos, pred_neg])
-        labels_all = np.hstack([np.ones(pos_edge.shape[0]), np.zeros(neg_edge.shape[0])])
-        roc_score = roc_auc_score(labels_all, preds_all)
-        ap_score = average_precision_score(labels_all, preds_all)
-
-        return roc_score, ap_score

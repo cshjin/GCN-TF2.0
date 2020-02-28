@@ -48,25 +48,23 @@ def main(argv):
         tf.config.experimental.set_visible_devices(gpus[FLAGS.gpu_id], 'GPU')
         device_id = '/device:GPU:0'
 
-    A_mat, X_mat, z_vec, train_idx, val_idx, test_idx = load_data(FLAGS.dataset)
+    A_mat, X_mat, z_vec, train_idx, val_idx, test_idx = load_data_planetoid(FLAGS.dataset)
     An_mat = preprocess_graph(A_mat)
 
+    data = split_edge(A_mat)
+    A_train = data[0]
+    train_pos_edges, train_neg_edges = data[1:3]
+    val_pos_edges, val_neg_edges = data[3:5]
+    test_pos_edges, test_neg_edges = data[5:]
     # N = A_mat.shape[0]
     K = z_vec.max() + 1
 
     with tf.device(device_id):
         gae = VGAE(An_mat, X_mat, [FLAGS.hidden1, K])
-        gae.train(A_mat)
-        # test_res = gae.evaluate(test_idx, z_vec[test_idx], training=False)
-        # W1 = gae.layer1.weight.numpy()
-        # W2 = gae.layer2.weight.numpy()
-        # print(np.linalg.norm(W1), np.linalg.norm(W2))
-        # gcn = GCN(An_mat_diag, X_mat_stack, [FLAGS.hidden1, K])
-        # gcn.train(train_idx_recal, z_vec[train_idx], val_idx_recal, z_vec[val_idx])
-        # test_res = gcn.evaluate(test_idx_recal, z_vec[test_idx], training=False)
-        # print("Dataset {}".format(FLAGS.dataset),
-        #       "Test loss {:.4f}".format(test_res[0]),
-        #       "test acc {:.4f}".format(test_res[1]))
+        gae.train(A_train, train_pos_edges, train_neg_edges, val_pos_edges, val_neg_edges)
+        roc, ap = gae.evaluate(test_pos_edges, test_neg_edges)
+        print("roc {:.4f}".format(roc),
+              "ap {:.4f}".format(ap))
 
 
 if __name__ == "__main__":
