@@ -1,4 +1,3 @@
-from scipy.sparse.csgraph import connected_components
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 import networkx as nx
@@ -61,19 +60,27 @@ def preprocess_features(features):
     return features.tocsr()
 
 
-def load_data(dsname):
+def load_data(dataset, train_share=0.1):
     """ Load splitted dataset from file, otherwise, dump the splited data to file
+
+    Parameters
+    ----------
+    dataset : str
+        Name of the dataset.
+    train_share : float
+        Training share, default 10% of the total number of nodes.
 
     Returns
     -------
-    A_mat:
-    X_mat:
-    z_vec:
-    train_idx:
-    val_idx:
-    test_idx:
+    A_mat : scipy.sparse matrix with csr format
+    X_mat : scipy.sparse matrix with csr format
+    z_vec : numpy.array
+    train_idx : np.array
+    val_idx : np.array
+    test_idx : np.array
+
     """
-    filename = 'data/{}.pickle'.format(dsname)
+    filename = 'data/{}.pickle'.format(dataset)
     # if exists
     if os.path.exists(filename):
         print('>>> Loading data from file!!!')
@@ -81,13 +88,21 @@ def load_data(dsname):
             A_mat, X_mat, z_vec, train_idx, val_idx, test_idx = pickle.load(f)
             return A_mat, X_mat, z_vec, train_idx, val_idx, test_idx
 
+    if dataset == "karate":
+        with open(filename, 'wb') as f:
+            print('>>> Dumping datasplit to file!!!')
+            data = load_data_karate()
+            pickle.dump(data, f)
+        return data
+
     # if not exists
-    A_mat, X_mat, z_vec = load_npz('data/{}.npz'.format(dsname))
+    A_mat, X_mat, z_vec = load_npz('data/{}.npz'.format(dataset))
     X_mat = X_mat.astype(np.float32)
 
     # remove non-connected component
     G = nx.from_scipy_sparse_matrix(A_mat)
     G = max(nx.connected_component_subgraphs(G), key=len)
+
     # remove selfloop edges
     G.remove_edges_from(G.selfloop_edges())
     A_mat = nx.adjacency_matrix(G)
@@ -126,12 +141,12 @@ def load_data_planetoid(dataset):
 
     Returns
     -------
-    A_mat,
-    X_mat,
-    z_vec,
-    idx_train,
-    idx_val,
-    idx_test
+    A_mat : scipy.sparse matrix with csr format
+    X_mat : scipy.sparse matrix with csr format
+    z_vec : numpy.array
+    train_idx : np.array
+    val_idx : np.array
+    test_idx : np.array
     """
     if dataset not in ['citeseer', 'cora', 'pubmed']:
         print("No dataset found!")
@@ -166,6 +181,29 @@ def load_data_planetoid(dataset):
     val_idx = range(len(objects['y']), len(objects['y']) + 500)
     test_idx = test_index_sort.tolist()
 
+    return A_mat, X_mat, z_vec, train_idx, val_idx, test_idx
+
+
+def load_data_karate():
+    """
+    Returns
+    -------
+    A_mat : scipy.sparse matrix with csr format
+    X_mat : scipy.sparse matrix with csr format
+    z_vec : numpy.array
+    train_idx : np.array
+    val_idx : np.array
+    test_idx : np.array
+    """
+    G = nx.karate_club_graph()
+    A_mat = nx.adjacency_matrix(G)
+    deg = A_mat.sum(1).A1
+    X_mat = sp.diags(deg)
+    y = [0 if G.node[u]['club'] == 'Mr. Hi' else 1 for u in G.node]
+    z_vec = np.array(y)
+    train_idx = np.array([0, 33])
+    val_idx = np.array([1, 32])
+    test_idx = np.arange(1, 33)
     return A_mat, X_mat, z_vec, train_idx, val_idx, test_idx
 
 
@@ -210,90 +248,6 @@ def load_npz(file_name):
         labels = loader.get('labels')
 
     return adj_matrix, attr_matrix, labels
-
-
-def largest_connected_components(adj, n_components=1):
-    """Select the largest connected components in the graph.
-
-    Parameters
-    ----------
-    sparse_graph : gust.SparseGraph
-        Input graph.
-    n_components : int, default 1
-        Number of largest connected components to keep.
-
-    Returns
-    -------
-    sparse_graph : gust.SparseGraph
-        Subgraph of the input graph where only the nodes in largest n_components are kept.
-
-    """
-    _, component_indices = connected_components(adj)
-    component_sizes = np.bincount(component_indices)
-    components_to_keep = np.argsort(component_sizes)[::-1][:n_components]  # reverse order to sort descending
-    nodes_to_keep = [
-        idx for (idx, component) in enumerate(component_indices) if component in components_to_keep
-
-
-    ]
-    # print("Selecting {0} largest connected components".format(n_components))
-    return nodes_to_keep
-
-
-def train_val_test_split_tabular(*arrays, train_size=0.5, val_size=0.3, test_size=0.2, stratify=None, random_state=None):
-    """
-    Split the arrays or matrices into random train, validation and test subsets.
-
-    Parameters
-    ----------
-    *arrays : sequence of indexables with same length / shape[0]
-            Allowed inputs are lists, numpy arrays or scipy-sparse matrices.
-    train_size : float, default 0.5
-        Proportion of the dataset included in the train split.
-    val_size : float, default 0.3
-        Proportion of the dataset included in the validation split.
-    test_size : float, default 0.2
-        Proportion of the dataset included in the test split.
-    stratify : array-like or None, default None
-        If not None, data is split in a stratified fashion, using this as the class labels.
-    random_state : int or None, default None
-        Random_state is the seed used by the random number generator;
-
-    Returns
-    -------
-    splitting : list, length=3 * len(arrays)
-        List containing train-validation-test split of inputs.
-
-    """
-    # DEBUG: fix the error when sum(train_size + test_size) != samples
-    if len(set(array.shape[0] for array in arrays)) != 1:
-        raise ValueError("Arrays must have equal first dimension.")
-    idx = np.arange(arrays[0].shape[0])
-    # train_sample = len(idx) * train_size
-    # val_sample = len(idx) * val_size
-    # test_sample = len(idx) - train_sample - val_sample
-    idx_train_and_val, idx_test = train_test_split(
-        idx,
-        random_state=random_state,
-        train_size=train_size + val_size,
-        test_size=test_size,
-        stratify=stratify)
-
-    if stratify is not None:
-        stratify = stratify[idx_train_and_val]
-        idx_train, idx_val = train_test_split(
-            idx_train_and_val,
-            random_state=random_state,
-            train_size=train_size,
-            test_size=val_size,
-            stratify=stratify)
-
-    result = []
-    for X in arrays:
-        result.append(X[idx_train])
-        result.append(X[idx_val])
-        result.append(X[idx_test])
-    return result
 
 
 def preprocess_graph(adj, c=1):
